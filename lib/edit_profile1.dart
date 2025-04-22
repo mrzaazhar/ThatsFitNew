@@ -1,3 +1,4 @@
+import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,8 @@ class _EditProfile1State extends State<EditProfile1> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -22,7 +25,7 @@ class _EditProfile1State extends State<EditProfile1> {
 
   Future<void> _loadUserData() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user != null) {
         final doc =
             await FirebaseFirestore.instance
@@ -52,8 +55,46 @@ class _EditProfile1State extends State<EditProfile1> {
     super.dispose();
   }
 
+  Future<void> _sendSignInLink(String email) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://fyptesting.page.link/profile',
+        handleCodeInApp: true,
+        iOSBundleId: 'com.example.ios',
+        androidPackageName: 'com.example.fyptesting',
+        androidInstallApp: true,
+        androidMinimumVersion: '12',
+      );
+
+      await _auth.sendSignInLinkToEmail(
+        email: email,
+        actionCodeSettings: actionCodeSettings,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Verification link sent to $email'),
+          duration: Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sending verification link: ${e.toString()}'),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _saveProfile(BuildContext context) async {
-    // Input validation
     if (_nameController.text.isEmpty ||
         _usernameController.text.isEmpty ||
         _emailController.text.isEmpty) {
@@ -63,7 +104,6 @@ class _EditProfile1State extends State<EditProfile1> {
       return;
     }
 
-    // Validate email format
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(_emailController.text.trim())) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -72,86 +112,17 @@ class _EditProfile1State extends State<EditProfile1> {
       return;
     }
 
-    // Validate password if provided
-    if (_passwordController.text.isNotEmpty &&
-        _passwordController.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Password must be at least 6 characters long')),
-      );
-      return;
-    }
-
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
-          ),
-        );
-      },
-    );
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user != null) {
-        bool needsReauth = false;
-
-        // Check if email is being changed
+        // If email is being changed, send verification link
         if (_emailController.text.trim() != user.email) {
-          needsReauth = true;
-        }
-
-        // Check if password is being changed
-        if (_passwordController.text.isNotEmpty) {
-          needsReauth = true;
-        }
-
-        // Reauthenticate if needed
-        if (needsReauth) {
-          try {
-            await _reauthenticateUser(context, user);
-          } catch (e) {
-            // Close loading dialog
-            Navigator.of(context).pop();
-
-            if (e is FirebaseAuthException) {
-              if (e.code == 'operation-cancelled') {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Operation cancelled')));
-              } else if (e.code == 'wrong-password') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Incorrect password. Please try again.'),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Authentication error: ${e.message}')),
-                );
-              }
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Authentication error: ${e.toString()}'),
-                ),
-              );
-            }
-            return;
-          }
-        }
-
-        // Update email if changed
-        if (_emailController.text.trim() != user.email) {
-          await user.updateEmail(_emailController.text.trim());
-        }
-
-        // Update password if provided
-        if (_passwordController.text.isNotEmpty) {
-          await user.updatePassword(_passwordController.text.trim());
+          await _sendSignInLink(_emailController.text.trim());
+          return;
         }
 
         // Update Firestore document
@@ -161,131 +132,26 @@ class _EditProfile1State extends State<EditProfile1> {
             .update({
               'name': _nameController.text.trim(),
               'username': _usernameController.text.trim(),
-              'email': _emailController.text.trim(),
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-        // Close loading dialog
-        Navigator.of(context).pop();
-
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile updated successfully!')),
         );
 
-        // Navigate to edit_profile2
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => EditProfilePage()),
         );
       }
-    } on FirebaseAuthException catch (e) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-
-      String message = 'Error updating profile';
-      if (e.code == 'weak-password') {
-        message = 'The password provided is too weak';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'The email is already in use';
-      } else if (e.code == 'requires-recent-login') {
-        message = 'Please log in again to update your profile';
-      } else if (e.code == 'invalid-email') {
-        message = 'The email address is invalid';
-      } else if (e.code == 'wrong-password') {
-        message = 'Incorrect password';
-      }
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating profile: ${e.toString()}')),
       );
-    }
-  }
-
-  // Helper method to reauthenticate user
-  Future<void> _reauthenticateUser(BuildContext context, User user) async {
-    // Show dialog to get current password
-    final TextEditingController passwordController = TextEditingController();
-    bool dialogConfirmed = false;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Reauthentication Required'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Please enter your current password to update your email or password.',
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Current Password',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (passwordController.text.isNotEmpty) {
-                  dialogConfirmed = true;
-                  Navigator.of(context).pop();
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter your current password'),
-                    ),
-                  );
-                }
-              },
-              child: Text('Confirm'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!dialogConfirmed || passwordController.text.isEmpty) {
-      throw FirebaseAuthException(
-        code: 'operation-cancelled',
-        message: 'Reauthentication cancelled',
-      );
-    }
-
-    try {
-      // Create credential with email and password
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: passwordController.text,
-      );
-
-      // Reauthenticate user
-      await user.reauthenticateWithCredential(credential);
-    } catch (e) {
-      throw FirebaseAuthException(
-        code: 'wrong-password',
-        message: 'Incorrect password',
-      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -413,17 +279,23 @@ class _EditProfile1State extends State<EditProfile1> {
                         Container(
                           margin: EdgeInsets.all(20),
                           child: ElevatedButton(
-                            onPressed: () {
-                              _saveProfile(context);
-                            },
-                            child: Text(
-                              'Save Profile',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'DM Sans',
-                                color: Colors.white,
-                              ),
-                            ),
+                            onPressed:
+                                _isLoading ? null : () => _saveProfile(context),
+                            child:
+                                _isLoading
+                                    ? CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    )
+                                    : Text(
+                                      'Save Profile',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontFamily: 'DM Sans',
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Color(0xFF6e9277),
                               padding: EdgeInsets.symmetric(
@@ -444,4 +316,8 @@ class _EditProfile1State extends State<EditProfile1> {
       ),
     );
   }
+}
+
+extension on FirebaseOptions {
+  get com => null;
 }
