@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1022696522166",
+    "project_id": "testdua-ea416",
+    "storage_bucket": "testdua-ea416.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1022696522166:android:b0374667c2ad549128c117",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKxwTbtRMWLv9QwJJbiV1EaK8FsY3_m-8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
