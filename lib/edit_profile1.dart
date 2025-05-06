@@ -125,6 +125,44 @@ class _EditProfile1State extends State<EditProfile1> {
           return;
         }
 
+        // Update password if provided
+        if (_passwordController.text.isNotEmpty) {
+          if (_passwordController.text.length < 6) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Password must be at least 6 characters long'),
+              ),
+            );
+            setState(() {
+              _isLoading = false;
+            });
+            return;
+          }
+
+          try {
+            await user.updatePassword(_passwordController.text);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Password updated successfully!')),
+            );
+          } catch (e) {
+            // If the error is due to recent authentication, we need to reauthenticate
+            if (e.toString().contains('requires-recent-login')) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Please sign out and sign in again before changing your password',
+                  ),
+                ),
+              );
+              setState(() {
+                _isLoading = false;
+              });
+              return;
+            }
+            throw e;
+          }
+        }
+
         // Update Firestore document
         await FirebaseFirestore.instance
             .collection('users')
