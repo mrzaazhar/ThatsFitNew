@@ -63,10 +63,7 @@ class DeleteProfilePage extends StatelessWidget {
                         SizedBox(height: 20),
                         Text(
                           'Are you sure you want to delete your account?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'DM Sans',
-                          ),
+                          style: TextStyle(fontSize: 16, fontFamily: 'DM Sans'),
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 10),
@@ -82,7 +79,8 @@ class DeleteProfilePage extends StatelessWidget {
                         SizedBox(height: 40),
                         // Delete Button
                         ElevatedButton(
-                          onPressed: () => _showDeleteConfirmationDialog(context),
+                          onPressed:
+                              () => _showDeleteConfirmationDialog(context),
                           child: Text(
                             'Delete Account',
                             style: TextStyle(
@@ -118,7 +116,9 @@ class DeleteProfilePage extends StatelessWidget {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Confirm Deletion'),
-          content: Text('Are you absolutely sure you want to delete your account? This action cannot be undone. You will need to create a new account to access ThatsFit again.'),
+          content: Text(
+            'Are you absolutely sure you want to delete your account? This action cannot be undone. You will need to create a new account to access ThatsFit again.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -129,10 +129,7 @@ class DeleteProfilePage extends StatelessWidget {
                 Navigator.of(context).pop();
                 _deleteAccount(context);
               },
-              child: Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -145,23 +142,31 @@ class DeleteProfilePage extends StatelessWidget {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         // Delete user data from Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .delete();
 
         // Delete user account from Firebase Auth
         await user.delete();
 
+        // Sign out the user
+        await FirebaseAuth.instance.signOut();
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Account deleted successfully. Please create a new account to access ThatsFit.'),
+            content: Text(
+              'Account deleted successfully. Please create a new account to access ThatsFit.',
+            ),
             duration: Duration(seconds: 5),
           ),
         );
 
-        // Navigate to main page and clear all previous routes
+        // Navigate to login page and clear all previous routes
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => MyApp()),
+          MaterialPageRoute(builder: (context) => LoginPage()),
           (route) => false,
         );
       }
@@ -170,9 +175,9 @@ class DeleteProfilePage extends StatelessWidget {
       if (e.code == 'requires-recent-login') {
         message = 'Please sign in again before deleting your account';
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting account: ${e.toString()}')),
