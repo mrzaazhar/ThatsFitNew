@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'profile_page.dart';
-//import 'steps_page.dart';
+import 'main.dart';
+import 'step_count.dart';
+import 'workout.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -12,16 +14,59 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0; // Track the selected index
   int _current = 0; // Track current carousel page
-  final CarouselController _carouselController =
-      CarouselController(); // Controller for carousel
 
   // List of widgets for each tab
-  final List<Widget> _widgetOptions = <Widget>[
-    Text('Home Screen'), // Replace with your Home widget
-    Text('Search Screen'), // Replace with your Search widget
-    Text('Back Screen'), // Replace with your Back widget
-    Text('Logout Screen'), // Replace with your Logout widget
-  ];
+  late final List<Widget> _widgetOptions;
+
+  @override
+  void initState() {
+    super.initState();
+    _widgetOptions = <Widget>[
+      Text('Home Screen'), // Replace with your Home widget
+      Text('Search Screen'), // Replace with your Search widget
+      Text('Back Screen'), // Replace with your Back widget
+      Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, size: 100, color: Colors.white),
+            SizedBox(height: 20),
+            Text(
+              'Are you sure you want to logout?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'DM Sans',
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                // Navigate to login page and clear navigation stack
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => LoginPage()),
+                  (route) => false,
+                );
+              },
+              child: Text(
+                'Logout',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontFamily: 'DM Sans',
+                  fontSize: 20,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF6e9277),
+                padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -65,17 +110,12 @@ class _HomePageState extends State<HomePage> {
             Column(
               children: [
                 SizedBox(height: 10),
-                CarouselSlider(
-                  carouselController:
-                      CarouselSliderController(), // Use correct controller type
+                CarouselSlider.builder(
+                  itemCount: 3,
                   options: CarouselOptions(
                     height: 160,
-                    autoPlay: true,
-                    autoPlayInterval: Duration(seconds: 3),
-                    autoPlayAnimationDuration: Duration(milliseconds: 800),
-                    autoPlayCurve: Curves.fastOutSlowIn,
-                    enlargeCenterPage: true,
-                    enlargeFactor: 10,
+                    viewportFraction: 1.0,
+                    enlargeCenterPage: false,
                     scrollDirection: Axis.horizontal,
                     onPageChanged: (index, reason) {
                       setState(() {
@@ -83,142 +123,153 @@ class _HomePageState extends State<HomePage> {
                       });
                     },
                   ),
-                  items: [
-                    // First Slide - Step Count
-                    Container(
-                      width: 600,
-                      //margin: EdgeInsets.symmetric(horizontal: 5.0),
-                      padding: const EdgeInsets.all(10.0),
-                      decoration: BoxDecoration(
-                        color: Color(0xFFbfbfbf),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Step Count',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'DM Sans',
-                            ),
-                          ),
-                          SizedBox(height: 15),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                child: CircularProgressIndicator(
-                                  value: 0.7,
-                                  backgroundColor: Colors.grey,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF33443c),
-                                  ),
-                                  strokeWidth: 10,
-                                ),
+                  itemBuilder: (context, index, realIndex) {
+                    if (index == 0) {
+                      return Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.zero,
+                        padding: const EdgeInsets.all(10.0),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFbfbfbf),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Step Count',
+                              style: TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'DM Sans',
                               ),
-                              SizedBox(width: 20),
-                              TextButton(
-                                onPressed: () {},
-                                child: Text(
-                                  'View More',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontFamily: 'DM Sans',
+                            ),
+                            SizedBox(height: 15),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  child: CircularProgressIndicator(
+                                    value: 0.7,
+                                    backgroundColor: Colors.grey,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF33443c),
+                                    ),
+                                    strokeWidth: 10,
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color(0xFF6e9277),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 15,
+                                SizedBox(width: 60),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => StepCountPage(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    'View More',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: 'DM Sans',
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Color(0xFF6e9277),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 15,
+                                    ),
                                   ),
                                 ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    } else if (index == 1) {
+                      return Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.zero,
+                        padding: const EdgeInsets.all(10.0),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFbfbfbf),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Daily Goal',
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'DM Sans',
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Second Slide - Daily Goal
-                    Container(
-                      width: 600,
-                      margin: EdgeInsets.symmetric(horizontal: 5.0),
-                      decoration: BoxDecoration(
-                        color: Color(0xFFbfbfbf),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Daily Goal',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'DM Sans',
                             ),
-                          ),
-                          SizedBox(height: 15),
-                          Text(
-                            '7000 / 10000',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'DM Sans',
+                            SizedBox(height: 15),
+                            Text(
+                              '7000 / 10000',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'DM Sans',
+                              ),
                             ),
-                          ),
-                          Text(
-                            'steps',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontFamily: 'DM Sans',
+                            Text(
+                              'steps',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontFamily: 'DM Sans',
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Third Slide - Weekly Progress
-                    Container(
-                      width: 600,
-                      margin: EdgeInsets.symmetric(horizontal: 5.0),
-                      decoration: BoxDecoration(
-                        color: Color(0xFFbfbfbf),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Weekly Progress',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'DM Sans',
+                          ],
+                        ),
+                      );
+                    } else {
+                      return Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.zero,
+                        padding: const EdgeInsets.all(10.0),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFbfbfbf),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Weekly Progress',
+                              style: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'DM Sans',
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 15),
-                          Text(
-                            '35,000 steps',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'DM Sans',
+                            SizedBox(height: 15),
+                            Text(
+                              '35,000 steps',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'DM Sans',
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Great progress!',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontFamily: 'DM Sans',
+                            Text(
+                              'Great progress!',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontFamily: 'DM Sans',
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                          ],
+                        ),
+                      );
+                    }
+                  },
                 ),
                 SizedBox(height: 10), // Space between carousel and dots
                 Row(
@@ -264,7 +315,12 @@ class _HomePageState extends State<HomePage> {
                   Center(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Handle create workout action
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WorkoutPage(),
+                          ),
+                        );
                       },
                       child: Text(
                         'Create Workout',
