@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:sensors_plus/sensors_plus.dart';
+import 'dart:math';
+import 'dart:async';
 
 class StepCountPage extends StatefulWidget {
   @override
@@ -6,11 +9,53 @@ class StepCountPage extends StatefulWidget {
 }
 
 class _StepCountPageState extends State<StepCountPage> {
-  // Mock data - In a real app, this would come from a step counting service
-  final int currentSteps = 7000;
+  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
+  int _currentSteps = 0;
   final int dailyGoal = 10000;
-  final int weeklyTotal = 35000;
+  int _weeklyTotal = 0;
   final int weeklyGoal = 70000;
+  double _lastMagnitude = 0;
+  double _threshold = 13.0;
+  bool _isStep = false;
+  DateTime? _lastStepTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAccelerometer();
+  }
+
+  void _initAccelerometer() {
+    _accelerometerSubscription = accelerometerEvents.listen((
+      AccelerometerEvent event,
+    ) {
+      // Calculate the magnitude of acceleration
+      double magnitude = sqrt(
+        event.x * event.x + event.y * event.y + event.z * event.z,
+      );
+
+      // Simple step detection algorithm
+      if (!_isStep && magnitude > _threshold && _lastMagnitude <= _threshold) {
+        // Check if enough time has passed since the last step (debouncing)
+        if (_lastStepTime == null ||
+            DateTime.now().difference(_lastStepTime!).inMilliseconds > 300) {
+          setState(() {
+            _currentSteps++;
+            _weeklyTotal = _currentSteps * 5; // For demo purposes
+            _lastStepTime = DateTime.now();
+          });
+        }
+      }
+
+      _lastMagnitude = magnitude;
+    });
+  }
+
+  @override
+  void dispose() {
+    _accelerometerSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +76,12 @@ class _StepCountPageState extends State<StepCountPage> {
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: _initAccelerometer,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(20),
@@ -79,7 +130,7 @@ class _StepCountPageState extends State<StepCountPage> {
                         height: 200,
                         width: 200,
                         child: CircularProgressIndicator(
-                          value: currentSteps / dailyGoal,
+                          value: _currentSteps / dailyGoal,
                           backgroundColor: Colors.grey[300],
                           valueColor: AlwaysStoppedAnimation<Color>(
                             Color(0xFF33443c),
@@ -93,13 +144,13 @@ class _StepCountPageState extends State<StepCountPage> {
                             Icons.emoji_events,
                             size: 40,
                             color:
-                                currentSteps >= dailyGoal
+                                _currentSteps >= dailyGoal
                                     ? Colors.amber
                                     : Colors.grey,
                           ),
                           SizedBox(height: 10),
                           Text(
-                            '$currentSteps',
+                            '$_currentSteps',
                             style: TextStyle(
                               fontSize: 36,
                               fontWeight: FontWeight.bold,
@@ -171,7 +222,7 @@ class _StepCountPageState extends State<StepCountPage> {
                   ),
                   SizedBox(height: 20),
                   LinearProgressIndicator(
-                    value: weeklyTotal / weeklyGoal,
+                    value: _weeklyTotal / weeklyGoal,
                     backgroundColor: Colors.grey[300],
                     valueColor: AlwaysStoppedAnimation<Color>(
                       Color(0xFF33443c),
@@ -183,7 +234,7 @@ class _StepCountPageState extends State<StepCountPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '$weeklyTotal steps',
+                        '$_weeklyTotal steps',
                         style: TextStyle(fontSize: 18, fontFamily: 'DM Sans'),
                       ),
                       Text(
@@ -192,50 +243,6 @@ class _StepCountPageState extends State<StepCountPage> {
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-            // Daily Stats Card
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Color(0xFFbfbfbf),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Daily Statistics',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'DM Sans',
-                        ),
-                      ),
-                      Icon(Icons.analytics, size: 30, color: Color(0xFF33443c)),
-                    ],
-                  ),
-                  SizedBox(height: 20),
-                  _buildStatRow(Icons.trending_up, 'Average Steps', '8,500'),
-                  _buildStatRow(Icons.emoji_events, 'Best Day', '12,000'),
-                  _buildStatRow(
-                    Icons.local_fire_department,
-                    'Calories Burned',
-                    '350',
-                  ),
-                  _buildStatRow(Icons.straighten, 'Distance', '5.2 km'),
                 ],
               ),
             ),
@@ -261,35 +268,6 @@ class _StepCountPageState extends State<StepCountPage> {
             value,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'DM Sans',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 24, color: Color(0xFF33443c)),
-              SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(fontSize: 18, fontFamily: 'DM Sans'),
-              ),
-            ],
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
               fontWeight: FontWeight.bold,
               fontFamily: 'DM Sans',
             ),

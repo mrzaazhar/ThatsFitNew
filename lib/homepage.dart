@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:sensors_plus/sensors_plus.dart';
+import 'dart:math';
+import 'dart:async';
 import 'profile_page.dart';
 import 'main.dart';
 import 'step_count.dart';
@@ -14,6 +17,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0; // Track the selected index
   int _current = 0; // Track current carousel page
+  int _currentSteps = 0;
+  final int dailyGoal = 10000;
+  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
+  double _lastMagnitude = 0;
+  double _threshold = 12.0; // Adjust this threshold based on testing
+  bool _isStep = false;
+  DateTime? _lastStepTime;
 
   // List of widgets for each tab
   late final List<Widget> _widgetOptions;
@@ -21,6 +31,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _initAccelerometer();
     _widgetOptions = <Widget>[
       Text('Home Screen'), // Replace with your Home widget
       Text('Search Screen'), // Replace with your Search widget
@@ -68,6 +79,37 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  void _initAccelerometer() {
+    _accelerometerSubscription = accelerometerEvents.listen((
+      AccelerometerEvent event,
+    ) {
+      // Calculate the magnitude of acceleration
+      double magnitude = sqrt(
+        event.x * event.x + event.y * event.y + event.z * event.z,
+      );
+
+      // Simple step detection algorithm
+      if (!_isStep && magnitude > _threshold && _lastMagnitude <= _threshold) {
+        // Check if enough time has passed since the last step (debouncing)
+        if (_lastStepTime == null ||
+            DateTime.now().difference(_lastStepTime!).inMilliseconds > 300) {
+          setState(() {
+            _currentSteps++;
+            _lastStepTime = DateTime.now();
+          });
+        }
+      }
+
+      _lastMagnitude = magnitude;
+    });
+  }
+
+  @override
+  void dispose() {
+    _accelerometerSubscription?.cancel();
+    super.dispose();
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index; // Update the selected index
@@ -90,6 +132,10 @@ class _HomePageState extends State<HomePage> {
         ),
         backgroundColor: Color(0xFF008000),
         actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: _initAccelerometer,
+          ),
           IconButton(
             icon: Icon(Icons.person, size: 40),
             onPressed: () {
@@ -152,7 +198,7 @@ class _HomePageState extends State<HomePage> {
                                   width: 80,
                                   height: 80,
                                   child: CircularProgressIndicator(
-                                    value: 0.7,
+                                    value: _currentSteps / dailyGoal,
                                     backgroundColor: Colors.grey,
                                     valueColor: AlwaysStoppedAnimation<Color>(
                                       Color(0xFF33443c),
@@ -160,7 +206,28 @@ class _HomePageState extends State<HomePage> {
                                     strokeWidth: 10,
                                   ),
                                 ),
-                                SizedBox(width: 60),
+                                SizedBox(width: 20),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$_currentSteps',
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'DM Sans',
+                                      ),
+                                    ),
+                                    Text(
+                                      'steps',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontFamily: 'DM Sans',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(width: 20),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.push(
