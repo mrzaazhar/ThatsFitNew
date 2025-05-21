@@ -4,6 +4,8 @@ import 'dart:math';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'services/workout_service.dart';
+import 'workout.dart';
 
 class StepCountPage extends StatefulWidget {
   @override
@@ -71,6 +73,7 @@ class _StepCountPageState extends State<StepCountPage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
+        // Update step count in Firebase
         await _firestore
             .collection('step_counts')
             .doc(user.uid)
@@ -80,9 +83,65 @@ class _StepCountPageState extends State<StepCountPage> {
           'steps': _currentSteps,
           'timestamp': FieldValue.serverTimestamp(),
         });
+
+        // Get fresh user profile data
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+
+          // Calculate weekly average steps
+          final weeklySnapshot = await _firestore
+              .collection('step_counts')
+              .doc(user.uid)
+              .collection('daily_counts')
+              .orderBy('date', descending: true)
+              .limit(7)
+              .get();
+
+          final weeklySteps = weeklySnapshot.docs
+              .map((doc) => doc.data()['steps'] as int)
+              .toList();
+          final weeklyAverage = weeklySteps.isEmpty
+              ? _currentSteps
+              : (weeklySteps.reduce((a, b) => a + b) / weeklySteps.length)
+                  .round();
+
+          // Create new workout with updated data
+          final workoutService = WorkoutService();
+          final result = await workoutService.createWorkout(
+            userId: user.uid,
+            stepCount: _currentSteps,
+            age: userData['age'] ?? 25,
+            trainingExperience: userData['trainingExperience'] ?? 'Beginner',
+            gender: userData['gender'] ?? 'Male',
+            weight: userData['weight']?.toDouble() ?? 70.0,
+          );
+
+          // Navigate to workout page with new suggestions
+          if (mounted) {
+            Navigator.pushReplacement(
+              // Use pushReplacement to prevent back navigation
+              context,
+              MaterialPageRoute(
+                builder: (context) => WorkoutPage(
+                  suggestedWorkout: result['workoutPlan'],
+                ),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       print('Error updating step count: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating workout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -117,6 +176,111 @@ class _StepCountPageState extends State<StepCountPage> {
   void dispose() {
     _accelerometerSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _showManualStepInputDialog() async {
+    final TextEditingController controller = TextEditingController();
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Enter Step Count'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            hintText: 'Enter your step count',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                if (controller.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please enter a step count')),
+                  );
+                  return;
+                }
+
+                final steps = int.parse(controller.text);
+                if (steps < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Step count cannot be negative')),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  _currentSteps = steps;
+                  _weeklyTotal = steps * 5; // For demo purposes
+                });
+
+                // Update Firebase
+                final user = _auth.currentUser;
+                if (user != null) {
+                  await _firestore
+                      .collection('step_counts')
+                      .doc(user.uid)
+                      .collection('daily_counts')
+                      .doc(_currentDate)
+                      .set({
+                    'steps': steps,
+                    'date': _currentDate,
+                    'timestamp': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+
+                  // Get fresh user profile data
+                  final userDoc =
+                      await _firestore.collection('users').doc(user.uid).get();
+                  if (userDoc.exists) {
+                    final userData = userDoc.data()!;
+
+                    // Create new workout with updated data
+                    final workoutService = WorkoutService();
+                    final result = await workoutService.createWorkout(
+                      userId: user.uid,
+                      stepCount: steps,
+                      age: userData['age'] ?? 25,
+                      trainingExperience:
+                          userData['trainingExperience'] ?? 'Beginner',
+                      gender: userData['gender'] ?? 'Male',
+                      weight: userData['weight']?.toDouble() ?? 70.0,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(context); // Close the dialog
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => WorkoutPage(
+                            suggestedWorkout: result['workoutPlan'],
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error updating step count: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -309,6 +473,12 @@ class _StepCountPageState extends State<StepCountPage> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showManualStepInputDialog,
+        backgroundColor: Color(0xFF33443c),
+        child: Icon(Icons.edit, color: Colors.white),
+        tooltip: 'Enter Step Count Manually',
       ),
     );
   }

@@ -9,7 +9,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
   runApp(const MyApp());
 }
 
@@ -41,29 +48,37 @@ class LoginPage extends StatelessWidget {
       return;
     }
 
+    print('Attempting login with email: ${_emailController.text.trim()}');
+
     try {
+      print('Calling Firebase Auth...');
       UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      print('Firebase Auth successful, user ID: ${userCredential.user?.uid}');
 
       // Check if user exists in Firestore
+      print('Checking Firestore for user document...');
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
           .get();
 
       if (!userDoc.exists) {
+        print('User document not found in Firestore');
         // If user doesn't exist in Firestore, show message and redirect to signup
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Account not found. Please sign up first.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(
+            content: Text('Account not found. Please sign up first.')));
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => SignUpPage()),
         );
       } else {
+        print('User document found, navigating to home page');
         // Navigate to home page after successful login
         Navigator.pushReplacement(
           context,
@@ -71,6 +86,7 @@ class LoginPage extends StatelessWidget {
         );
       }
     } on FirebaseAuthException catch (e) {
+      print('Firebase Auth Exception: ${e.code} - ${e.message}');
       String message = 'Login failed';
       if (e.code == 'user-not-found') {
         message = 'No user found with this email. Please sign up first.';
@@ -85,14 +101,18 @@ class LoginPage extends StatelessWidget {
         message = 'The email address is not valid';
       } else if (e.code == 'user-disabled') {
         message = 'This account has been disabled';
+      } else if (e.code == 'network-request-failed') {
+        message = 'Network error. Please check your internet connection.';
       }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
+      print('General Exception during login: $e');
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('An error occurred during login')));
+      ).showSnackBar(SnackBar(
+          content: Text('An error occurred during login: ${e.toString()}')));
     }
   }
 

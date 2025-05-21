@@ -8,6 +8,7 @@ import 'profile_page.dart';
 import 'main.dart';
 import 'step_count.dart';
 import 'workout.dart';
+import 'widgets/create_workout_button.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -341,23 +342,21 @@ class _HomePageState extends State<HomePage> {
                 SizedBox(height: 10), // Space between carousel and dots
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children:
-                      [0, 1, 2].map((index) {
-                        return Container(
-                          width: 8.0,
-                          height: 8.0,
-                          margin: EdgeInsets.symmetric(horizontal: 4.0),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color:
-                                _current == index
-                                    ? Color(0xFF33443c) // Active dot color
-                                    : Colors.white.withOpacity(
-                                      0.4,
-                                    ), // Inactive dot color
-                          ),
-                        );
-                      }).toList(),
+                  children: [0, 1, 2].map((index) {
+                    return Container(
+                      width: 8.0,
+                      height: 8.0,
+                      margin: EdgeInsets.symmetric(horizontal: 4.0),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _current == index
+                            ? Color(0xFF33443c) // Active dot color
+                            : Colors.white.withOpacity(
+                                0.4,
+                              ), // Inactive dot color
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -376,35 +375,28 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.end, // Align the button to the bottom
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Center(
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: CreateWorkoutButton(
+                      userId:
+                          'user123', // Replace with actual user ID from your auth system
+                      stepCount: _currentSteps,
+                      age: 25, // Replace with actual user age from profile
+                      trainingExperience:
+                          'Intermediate', // Replace with actual user experience
+                      gender: 'Male', // Replace with actual user gender
+                      weight: 70.5, // Replace with actual user weight
+                      onWorkoutCreated: (result) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => WorkoutPage(),
+                            builder: (context) => WorkoutPage(
+                              suggestedWorkout: result['workoutPlan'],
+                            ),
                           ),
                         );
                       },
-                      child: Text(
-                        'Create Workout',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontFamily: 'DM Sans',
-                          fontSize: 23,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF6e9277),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 50,
-                          vertical: 15,
-                        ),
-                      ),
                     ),
                   ),
                 ],
