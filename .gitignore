@@ -43,3 +43,12 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Ignore Firebase Admin SDK service account key
+backend/serviceAccountKeyNew.json
+
+# Firebase credentials
+.env
+
+#firebase_options.dart
+firebase_options.dart

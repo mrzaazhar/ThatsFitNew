@@ -6,15 +6,26 @@ const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3001; // Force port 3001
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // Initialize Firebase Admin
-// You'll need to download your Firebase service account key and save it as 'serviceAccountKey.json'
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+};
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -22,172 +33,117 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Example REST endpoints
+// User-specific endpoints
 
-// Get all documents from a collection
-app.get('/api/:collection', async (req, res) => {
+// Get all users
+app.get('/api/users', async (req, res) => {
   try {
-    const { collection } = req.params;
-    const snapshot = await db.collection(collection).get();
-    const documents = [];
+    const snapshot = await db.collection('users').get();
+    const users = [];
     snapshot.forEach(doc => {
-      documents.push({
+      users.push({
         id: doc.id,
         ...doc.data()
       });
     });
-    res.json(documents);
+    res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get a specific document by ID
-app.get('/api/:collection/:id', async (req, res) => {
+// Get a specific user by ID
+app.get('/api/users/:userId', async (req, res) => {
   try {
-    const { collection, id } = req.params;
-    const doc = await db.collection(collection).doc(id).get();
-    if (!doc.exists) {
-      return res.status(404).json({ error: 'Document not found' });
+    const { userId } = req.params;
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
     }
     res.json({
-      id: doc.id,
-      ...doc.data()
+      id: userDoc.id,
+      ...userDoc.data()
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Create a new document
-app.post('/api/:collection', async (req, res) => {
+// Create a new user
+app.post('/api/users', async (req, res) => {
   try {
-    const { collection } = req.params;
-    const data = req.body;
-    const docRef = await db.collection(collection).add(data);
+    const userData = req.body;
+    const docRef = await db.collection('users').add({
+      ...userData,
+      dailySteps: 0,
+      weeklySteps: 0,
+      lastResetDate: new Date().toISOString().split('T')[0],
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
     res.status(201).json({
       id: docRef.id,
-      message: 'Document created successfully'
+      message: 'User created successfully'
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Update a document
-app.put('/api/:collection/:id', async (req, res) => {
+// Update user data
+app.put('/api/users/:userId', async (req, res) => {
   try {
-    const { collection, id } = req.params;
-    const data = req.body;
-    await db.collection(collection).doc(id).update(data);
-    res.json({ message: 'Document updated successfully' });
+    const { userId } = req.params;
+    const userData = req.body;
+    await db.collection('users').doc(userId).update({
+      ...userData,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ message: 'User updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Delete a document
-app.delete('/api/:collection/:id', async (req, res) => {
+// Update user's step count
+app.put('/api/users/:userId/steps', async (req, res) => {
   try {
-    const { collection, id } = req.params;
-    await db.collection(collection).doc(id).delete();
-    res.json({ message: 'Document deleted successfully' });
+    const { userId } = req.params;
+    const { steps } = req.body;
+    
+    const userRef = db.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userData = userDoc.data();
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    // Check if we need to reset daily steps
+    if (userData.lastResetDate !== currentDate) {
+      await userRef.update({
+        dailySteps: steps,
+        weeklySteps: (userData.weeklySteps || 0) + steps,
+        lastResetDate: currentDate,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      await userRef.update({
+        dailySteps: steps,
+        weeklySteps: (userData.weeklySteps || 0) + (steps - (userData.dailySteps || 0)),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    res.json({ message: 'Step count updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
 // Create workout with user data and Flowise integration
-app.post('/api/create-workout', async (req, res) => {
-  try {
-    const { userId, stepCount, age, trainingExperience, gender, weight } = req.body;
-
-    // Validate required fields
-    if (!userId || !stepCount || !age || !trainingExperience || !gender || !weight) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Get user data from Firestore
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Prepare data for Flowise
-    const flowiseData = {
-      stepCount,
-      age,
-      trainingExperience,
-      gender,
-      weight
-    };
-
-    console.log('Calling Flowise API...');
-    console.log('URL:', process.env.FLOWISE_API_URL);
-    console.log('Headers:', {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'timestamp': Date.now().toString()
-    });
-    console.log('Body:', flowiseData);
-
-    const flowiseResponse = await axios.post(process.env.FLOWISE_API_URL, flowiseData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'timestamp': Date.now().toString()
-      }
-    });
-
-    console.log('Flowise Response Status:', flowiseResponse.status);
-    console.log('Flowise Response Data (truncated):', JSON.stringify(flowiseResponse.data).substring(0, 500) + '...');
-
-    // Map Flowise response to expected format
-    const flowiseDataRaw = flowiseResponse.data;
-    const workoutPlan = {
-      name: flowiseDataRaw.name || 'Custom Workout',
-      duration: flowiseDataRaw.duration || '30 min',
-      calories: flowiseDataRaw.calories || '200-300',
-      difficulty: flowiseDataRaw.difficulty || 'Intermediate',
-      description: flowiseDataRaw.description || 'A personalized workout plan based on your profile and activity.',
-      exercises: Array.isArray(flowiseDataRaw.exercises)
-        ? flowiseDataRaw.exercises
-        : (typeof flowiseDataRaw.exercises === 'string'
-            ? flowiseDataRaw.exercises.split('\n')
-            : ['Custom exercises will be displayed here']),
-    };
-
-    // Save workout data to Firestore
-    const workoutData = {
-      userId,
-      stepCount,
-      age,
-      trainingExperience,
-      gender,
-      weight,
-      workoutPlan,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const workoutRef = await db.collection('workouts').add(workoutData);
-
-    res.status(201).json({
-      id: workoutRef.id,
-      message: 'Workout created successfully',
-      workoutPlan
-    });
-  } catch (error) {
-    console.error('Error creating workout:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get step counts and user data for Flowise
-app.get('/api/user-data/:userId', async (req, res) => {
+app.post('/api/users/:userId/create-workout', async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -197,58 +153,141 @@ app.get('/api/user-data/:userId', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get step counts for the last 7 days
-    const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
-
-    const stepCountsSnapshot = await db
-      .collection('step_counts')
-      .doc(userId)
-      .collection('daily_counts')
-      .where('date', '>=', sevenDaysAgo.toISOString().split('T')[0])
-      .get();
-
-    const stepCounts = stepCountsSnapshot.docs.map(doc => ({
-      date: doc.data().date,
-      steps: doc.data().steps,
-      timestamp: doc.data().timestamp?.toDate()
-    }));
-
-    // Prepare data for Flowise
+    // Get the user data from Firebase
     const userData = userDoc.data();
+    console.log('\n=== Firebase User Data ===');
+    console.log('User Data from Firebase:', userData);
+
+    // Prepare data for Flowise using Firebase data
     const flowiseData = {
-      userProfile: {
-        age: userData.age,
-        weight: userData.weight,
-        gender: userData.gender,
-        trainingExperience: userData.experience
-      },
-      stepData: {
-        dailyCounts: stepCounts,
-        weeklyTotal: stepCounts.reduce((sum, day) => sum + day.steps, 0),
-        averageDailySteps: Math.round(stepCounts.reduce((sum, day) => sum + day.steps, 0) / stepCounts.length)
-      }
+      question: "Create a workout plan",
+      history: [],
+      overrideConfig: {},
+      returnSourceDocuments: true,
+      // Use the data directly from Firebase
+      age: userData.age?.toString(),
+      weight: userData.weight?.toString(),
+      gender: userData.gender,
+      trainingExperience: userData.trainingExperience || userData.experience, // Check both possible field names
+      stepCount: userData.dailySteps?.toString()
     };
 
-    // Call Flowise API
-    const flowiseResponse = await axios.post(process.env.FLOWISE_API_URL, flowiseData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`
+    console.log('\n=== Flowise Request Details ===');
+    console.log('User ID:', userId);
+    console.log('Flowise Request Data:', flowiseData);
+
+    if (!process.env.FLOWISE_API_URL) {
+      throw new Error('FLOWISE_API_URL is not configured');
+    }
+
+    if (!process.env.FLOWISE_API_KEY) {
+      throw new Error('FLOWISE_API_KEY is not configured');
+    }
+
+    // Validate Flowise URL format
+    try {
+      new URL(process.env.FLOWISE_API_URL);
+    } catch (e) {
+      throw new Error(`Invalid FLOWISE_API_URL format: ${process.env.FLOWISE_API_URL}`);
+    }
+
+    console.log('\n=== Flowise API Call ===');
+    console.log('API URL:', process.env.FLOWISE_API_URL);
+    console.log('Request Headers:', {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'timestamp': Date.now().toString()
+    });
+    console.log('Request Body:', JSON.stringify(flowiseData, null, 2));
+
+    try {
+      const flowiseResponse = await axios.post(process.env.FLOWISE_API_URL, flowiseData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'timestamp': Date.now().toString()
+        },
+        timeout: 30000 // 30 second timeout
+      });
+
+      console.log('\n=== Flowise Response ===');
+      console.log('Status:', flowiseResponse.status);
+      console.log('Response Headers:', flowiseResponse.headers);
+      console.log('Response Data:', JSON.stringify(flowiseResponse.data, null, 2));
+
+      // Parse the Flowise response
+      const flowiseText = flowiseResponse.data.text || '';
+      console.log('Flowise Text Response:', flowiseText);
+
+      // Create a structured workout plan from the response
+      const workoutPlan = {
+        name: 'Custom Workout Plan',
+        duration: '30-45 min',
+        calories: '200-300',
+        difficulty: userData.trainingExperience || userData.experience,
+        description: flowiseText,
+        exercises: flowiseText.split('\n').filter(line => line.trim().length > 0),
+      };
+
+      console.log('\n=== Processed Workout Plan ===');
+      console.log('Workout Plan:', JSON.stringify(workoutPlan, null, 2));
+
+      // Only return the workout plan in the response
+      console.log('\n=== Sending Response to Client ===');
+      console.log({
+        message: 'Workout created successfully',
+        workoutPlan
+      });
+      res.status(201).json({
+        message: 'Workout created successfully',
+        workoutPlan
+      });
+    } catch (flowiseError) {
+      console.error('\n=== Flowise API Error ===');
+      console.error('Error details:', flowiseError.message);
+      if (flowiseError.response) {
+        console.error('Response status:', flowiseError.response.status);
+        console.error('Response data:', flowiseError.response.data);
+        console.error('Response headers:', flowiseError.response.headers);
       }
-    });
-
-    // Return the combined data
-    res.json({
-      userProfile: flowiseData.userProfile,
-      stepData: flowiseData.stepData,
-      flowiseResponse: flowiseResponse.data
-    });
-
+      if (flowiseError.request) {
+        console.error('Request details:', {
+          method: flowiseError.request.method,
+          path: flowiseError.request.path,
+          headers: flowiseError.request.getHeaders?.()
+        });
+      }
+      throw new Error(`Flowise API Error: ${flowiseError.message}`);
+    }
   } catch (error) {
-    console.error('Error fetching user data:', error);
-    res.status(500).json({ error: 'Failed to fetch user data' });
+    console.error('\n=== Error in create-workout ===');
+    console.error('Error details:', error.message);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user's workout history
+app.get('/api/users/:userId/workouts', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userData = userDoc.data();
+    res.json({
+      currentWorkout: userData.currentWorkout || null,
+      lastWorkoutCreated: userData.lastWorkoutCreated || null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

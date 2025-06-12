@@ -25,6 +25,7 @@ class _StepCountPageState extends State<StepCountPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   String? _currentDate;
+  Timer? _midnightTimer;
 
   @override
   void initState() {
@@ -32,36 +33,63 @@ class _StepCountPageState extends State<StepCountPage> {
     _currentDate = DateTime.now().toIso8601String().split('T')[0];
     _loadStepCount();
     _initAccelerometer();
+    _setupMidnightReset();
+  }
+
+  void _setupMidnightReset() {
+    // Calculate time until next midnight
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final timeUntilMidnight = nextMidnight.difference(now);
+
+    // Set up timer for midnight reset
+    _midnightTimer = Timer(timeUntilMidnight, () {
+      _resetStepCount();
+      // Set up next midnight timer
+      _setupMidnightReset();
+    });
+  }
+
+  Future<void> _resetStepCount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Reset step count in users collection
+        await _firestore.collection('users').doc(user.uid).update({
+          'dailySteps': 0,
+          'lastResetDate': DateTime.now().toIso8601String().split('T')[0],
+        });
+
+        setState(() {
+          _currentSteps = 0;
+        });
+      }
+    } catch (e) {
+      print('Error resetting step count: $e');
+    }
   }
 
   Future<void> _loadStepCount() async {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final doc = await _firestore
-            .collection('step_counts')
-            .doc(user.uid)
-            .collection('daily_counts')
-            .doc(_currentDate)
-            .get();
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
 
-        if (doc.exists) {
-          setState(() {
-            _currentSteps = doc.data()?['steps'] ?? 0;
-            _weeklyTotal = _currentSteps * 5; // For demo purposes
-          });
-        } else {
-          // If no data exists for today, create a new document
-          await _firestore
-              .collection('step_counts')
-              .doc(user.uid)
-              .collection('daily_counts')
-              .doc(_currentDate)
-              .set({
-            'steps': 0,
-            'date': _currentDate,
-            'timestamp': FieldValue.serverTimestamp(),
-          });
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          final lastResetDate = userData['lastResetDate'] as String?;
+          final currentDate = DateTime.now().toIso8601String().split('T')[0];
+
+          // Check if we need to reset (new day)
+          if (lastResetDate != currentDate) {
+            await _resetStepCount();
+          } else {
+            setState(() {
+              _currentSteps = userData['dailySteps'] ?? 0;
+              _weeklyTotal = userData['weeklySteps'] ?? 0;
+            });
+          }
         }
       }
     } catch (e) {
@@ -73,15 +101,11 @@ class _StepCountPageState extends State<StepCountPage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // Update step count in Firebase
-        await _firestore
-            .collection('step_counts')
-            .doc(user.uid)
-            .collection('daily_counts')
-            .doc(_currentDate)
-            .update({
-          'steps': _currentSteps,
-          'timestamp': FieldValue.serverTimestamp(),
+        // Update step count in users collection
+        await _firestore.collection('users').doc(user.uid).update({
+          'dailySteps': _currentSteps,
+          'weeklySteps': _weeklyTotal,
+          'lastUpdated': FieldValue.serverTimestamp(),
         });
 
         // Get fresh user profile data
@@ -90,30 +114,13 @@ class _StepCountPageState extends State<StepCountPage> {
         if (userDoc.exists) {
           final userData = userDoc.data()!;
 
-          // Calculate weekly average steps
-          final weeklySnapshot = await _firestore
-              .collection('step_counts')
-              .doc(user.uid)
-              .collection('daily_counts')
-              .orderBy('date', descending: true)
-              .limit(7)
-              .get();
-
-          final weeklySteps = weeklySnapshot.docs
-              .map((doc) => doc.data()['steps'] as int)
-              .toList();
-          final weeklyAverage = weeklySteps.isEmpty
-              ? _currentSteps
-              : (weeklySteps.reduce((a, b) => a + b) / weeklySteps.length)
-                  .round();
-
           // Create new workout with updated data
           final workoutService = WorkoutService();
           final result = await workoutService.createWorkout(
             userId: user.uid,
-            stepCount: _currentSteps,
+            dailySteps: _currentSteps,
             age: userData['age'] ?? 25,
-            trainingExperience: userData['trainingExperience'] ?? 'Beginner',
+            experience: userData['experience'] ?? 'Beginner',
             gender: userData['gender'] ?? 'Male',
             weight: userData['weight']?.toDouble() ?? 70.0,
           );
@@ -121,7 +128,6 @@ class _StepCountPageState extends State<StepCountPage> {
           // Navigate to workout page with new suggestions
           if (mounted) {
             Navigator.pushReplacement(
-              // Use pushReplacement to prevent back navigation
               context,
               MaterialPageRoute(
                 builder: (context) => WorkoutPage(
@@ -175,6 +181,7 @@ class _StepCountPageState extends State<StepCountPage> {
   @override
   void dispose() {
     _accelerometerSubscription?.cancel();
+    _midnightTimer?.cancel();
     super.dispose();
   }
 
@@ -223,16 +230,11 @@ class _StepCountPageState extends State<StepCountPage> {
                 // Update Firebase
                 final user = _auth.currentUser;
                 if (user != null) {
-                  await _firestore
-                      .collection('step_counts')
-                      .doc(user.uid)
-                      .collection('daily_counts')
-                      .doc(_currentDate)
-                      .set({
-                    'steps': steps,
-                    'date': _currentDate,
-                    'timestamp': FieldValue.serverTimestamp(),
-                  }, SetOptions(merge: true));
+                  await _firestore.collection('users').doc(user.uid).update({
+                    'dailySteps': steps,
+                    'weeklySteps': _weeklyTotal,
+                    'lastUpdated': FieldValue.serverTimestamp(),
+                  });
 
                   // Get fresh user profile data
                   final userDoc =
@@ -244,10 +246,9 @@ class _StepCountPageState extends State<StepCountPage> {
                     final workoutService = WorkoutService();
                     final result = await workoutService.createWorkout(
                       userId: user.uid,
-                      stepCount: steps,
+                      dailySteps: steps,
                       age: userData['age'] ?? 25,
-                      trainingExperience:
-                          userData['trainingExperience'] ?? 'Beginner',
+                      experience: userData['experience'] ?? 'Beginner',
                       gender: userData['gender'] ?? 'Male',
                       weight: userData['weight']?.toDouble() ?? 70.0,
                     );

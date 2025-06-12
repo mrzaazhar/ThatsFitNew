@@ -9,6 +9,7 @@ import 'main.dart';
 import 'step_count.dart';
 import 'workout.dart';
 import 'widgets/create_workout_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -119,6 +120,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid;
     return Scaffold(
       backgroundColor: Color(0xFF008000), // Background color
       appBar: AppBar(
@@ -379,14 +382,13 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Center(
                     child: CreateWorkoutButton(
-                      userId:
-                          'user123', // Replace with actual user ID from your auth system
-                      stepCount: _currentSteps,
-                      age: 25, // Replace with actual user age from profile
-                      trainingExperience:
+                      userId: userId ?? '',
+                      dailySteps: _currentSteps,
+                      age: 22, // Replace with actual user age from profile
+                      experience:
                           'Intermediate', // Replace with actual user experience
                       gender: 'Male', // Replace with actual user gender
-                      weight: 70.5, // Replace with actual user weight
+                      weight: 65, // Replace with actual user weight
                       onWorkoutCreated: (result) {
                         Navigator.push(
                           context,

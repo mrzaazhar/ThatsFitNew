@@ -3,9 +3,9 @@ import '../services/workout_service.dart';
 
 class CreateWorkoutButton extends StatelessWidget {
   final String userId;
-  final int stepCount;
+  final int dailySteps;
   final int age;
-  final String trainingExperience;
+  final String experience;
   final String gender;
   final double weight;
   final Function(Map<String, dynamic>) onWorkoutCreated;
@@ -13,9 +13,9 @@ class CreateWorkoutButton extends StatelessWidget {
   const CreateWorkoutButton({
     Key? key,
     required this.userId,
-    required this.stepCount,
+    required this.dailySteps,
     required this.age,
-    required this.trainingExperience,
+    required this.experience,
     required this.gender,
     required this.weight,
     required this.onWorkoutCreated,
@@ -26,9 +26,9 @@ class CreateWorkoutButton extends StatelessWidget {
       final workoutService = WorkoutService();
       final result = await workoutService.createWorkout(
         userId: userId,
-        stepCount: stepCount,
+        dailySteps: dailySteps,
         age: age,
-        trainingExperience: trainingExperience,
+        experience: experience,
         gender: gender,
         weight: weight,
       );
