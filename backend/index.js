@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 const axios = require('axios');
 const fs = require('fs');
 require('dotenv').config();
+const { getWorkoutRecommendation } = require('./flowise');
 
 const app = express();
 const port = 3001; // Force port 3001
@@ -34,6 +35,22 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // User-specific endpoints
+
+async function query(data) {
+  const response = await fetch(
+      "http://localhost:3000/api/v1/prediction/5bdfeb41-b68c-4eba-b643-52ffd8900b3a",
+      {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json"
+          },
+          body: JSON.stringify(data)
+      }
+  );
+  const result = await response.json();
+  return result;
+}
+
 
 // Get all users
 app.get('/api/users', async (req, res) => {
@@ -146,128 +163,22 @@ app.put('/api/users/:userId/steps', async (req, res) => {
 app.post('/api/users/:userId/create-workout', async (req, res) => {
   try {
     const { userId } = req.params;
-
-    // Get user data from Firestore
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Get the user data from Firebase
-    const userData = userDoc.data();
-    console.log('\n=== Firebase User Data ===');
-    console.log('User Data from Firebase:', userData);
-
-    // Prepare data for Flowise using Firebase data
-    const flowiseData = {
-      question: "Create a workout plan",
-      history: [],
-      overrideConfig: {},
-      returnSourceDocuments: true,
-      // Use the data directly from Firebase
-      age: userData.age?.toString(),
-      weight: userData.weight?.toString(),
-      gender: userData.gender,
-      trainingExperience: userData.trainingExperience || userData.experience, // Check both possible field names
-      stepCount: userData.dailySteps?.toString()
-    };
-
-    console.log('\n=== Flowise Request Details ===');
+    console.log('\n=== Create Workout Request Received ===');
     console.log('User ID:', userId);
-    console.log('Flowise Request Data:', flowiseData);
 
-    if (!process.env.FLOWISE_API_URL) {
-      throw new Error('FLOWISE_API_URL is not configured');
-    }
-
-    if (!process.env.FLOWISE_API_KEY) {
-      throw new Error('FLOWISE_API_KEY is not configured');
-    }
-
-    // Validate Flowise URL format
-    try {
-      new URL(process.env.FLOWISE_API_URL);
-    } catch (e) {
-      throw new Error(`Invalid FLOWISE_API_URL format: ${process.env.FLOWISE_API_URL}`);
-    }
-
-    console.log('\n=== Flowise API Call ===');
-    console.log('API URL:', process.env.FLOWISE_API_URL);
-    console.log('Request Headers:', {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'timestamp': Date.now().toString()
-    });
-    console.log('Request Body:', JSON.stringify(flowiseData, null, 2));
-
-    try {
-      const flowiseResponse = await axios.post(process.env.FLOWISE_API_URL, flowiseData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.FLOWISE_API_KEY}`,
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'timestamp': Date.now().toString()
-        },
-        timeout: 30000 // 30 second timeout
-      });
-
-      console.log('\n=== Flowise Response ===');
-      console.log('Status:', flowiseResponse.status);
-      console.log('Response Headers:', flowiseResponse.headers);
-      console.log('Response Data:', JSON.stringify(flowiseResponse.data, null, 2));
-
-      // Parse the Flowise response
-      const flowiseText = flowiseResponse.data.text || '';
-      console.log('Flowise Text Response:', flowiseText);
-
-      // Create a structured workout plan from the response
-      const workoutPlan = {
-        name: 'Custom Workout Plan',
-        duration: '30-45 min',
-        calories: '200-300',
-        difficulty: userData.trainingExperience || userData.experience,
-        description: flowiseText,
-        exercises: flowiseText.split('\n').filter(line => line.trim().length > 0),
-      };
-
-      console.log('\n=== Processed Workout Plan ===');
-      console.log('Workout Plan:', JSON.stringify(workoutPlan, null, 2));
-
-      // Only return the workout plan in the response
-      console.log('\n=== Sending Response to Client ===');
-      console.log({
-        message: 'Workout created successfully',
-        workoutPlan
-      });
-      res.status(201).json({
-        message: 'Workout created successfully',
-        workoutPlan
-      });
-    } catch (flowiseError) {
-      console.error('\n=== Flowise API Error ===');
-      console.error('Error details:', flowiseError.message);
-      if (flowiseError.response) {
-        console.error('Response status:', flowiseError.response.status);
-        console.error('Response data:', flowiseError.response.data);
-        console.error('Response headers:', flowiseError.response.headers);
-      }
-      if (flowiseError.request) {
-        console.error('Request details:', {
-          method: flowiseError.request.method,
-          path: flowiseError.request.path,
-          headers: flowiseError.request.getHeaders?.()
-        });
-      }
-      throw new Error(`Flowise API Error: ${flowiseError.message}`);
-    }
+    // Get workout recommendation using the new flowise functions
+    const result = await getWorkoutRecommendation(userId);
+    
+    console.log('\n=== Sending Response to Client ===');
+    console.log(result);
+    
+    res.status(201).json(result);
   } catch (error) {
-    console.error('\n=== Error in create-workout ===');
-    console.error('Error details:', error.message);
-    console.error('Stack trace:', error.stack);
-    res.status(500).json({ error: error.message });
+    console.error('Error in create-workout endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to create workout',
+      details: error.message 
+    });
   }
 });
 
