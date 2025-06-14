@@ -1,8 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
-const axios = require('axios');
-const fs = require('fs');
 require('dotenv').config();
 const { getWorkoutRecommendation } = require('./flowise');
 
@@ -33,24 +31,6 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-
-// User-specific endpoints
-
-async function query(data) {
-  const response = await fetch(
-      "http://localhost:3000/api/v1/prediction/5bdfeb41-b68c-4eba-b643-52ffd8900b3a",
-      {
-          method: "POST",
-          headers: {
-              "Content-Type": "application/json"
-          },
-          body: JSON.stringify(data)
-      }
-  );
-  const result = await response.json();
-  return result;
-}
-
 
 // Get all users
 app.get('/api/users', async (req, res) => {
@@ -106,22 +86,7 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// Update user data
-app.put('/api/users/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const userData = req.body;
-    await db.collection('users').doc(userId).update({
-      ...userData,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
-    res.json({ message: 'User updated successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update user's step count
+// Update user's step count - only updates steps, doesn't trigger workout creation
 app.put('/api/users/:userId/steps', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -137,7 +102,7 @@ app.put('/api/users/:userId/steps', async (req, res) => {
     const userData = userDoc.data();
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // Check if we need to reset daily steps
+    // Only update step counts, no workout creation
     if (userData.lastResetDate !== currentDate) {
       await userRef.update({
         dailySteps: steps,
@@ -146,59 +111,56 @@ app.put('/api/users/:userId/steps', async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
+      // Calculate the step difference for weekly total
+      const stepDifference = steps - (userData.dailySteps || 0);
       await userRef.update({
         dailySteps: steps,
-        weeklySteps: (userData.weeklySteps || 0) + (steps - (userData.dailySteps || 0)),
+        weeklySteps: (userData.weeklySteps || 0) + stepDifference,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
 
-    res.json({ message: 'Step count updated successfully' });
+    // Return success without triggering workout creation
+    res.json({ 
+      message: 'Step count updated successfully',
+      dailySteps: steps,
+      weeklySteps: userData.weeklySteps + (userData.lastResetDate !== currentDate ? steps : stepDifference)
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Create workout with user data and Flowise integration
+// Create workout endpoint - only fetches data when explicitly called
 app.post('/api/users/:userId/create-workout', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log('\n=== Create Workout Request Received ===');
     console.log('User ID:', userId);
+    console.log('Request headers:', req.headers);
+    console.log('Request body:', req.body);
 
-    // Get workout recommendation using the new flowise functions
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    // Get workout recommendation using the flowise functions
+    console.log('Calling getWorkoutRecommendation...');
     const result = await getWorkoutRecommendation(userId);
     
     console.log('\n=== Sending Response to Client ===');
-    console.log(result);
+    console.log('Response status: 201');
+    console.log('Response data:', result);
     
     res.status(201).json(result);
   } catch (error) {
     console.error('Error in create-workout endpoint:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Failed to create workout',
-      details: error.message 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
-  }
-});
-
-// Get user's workout history
-app.get('/api/users/:userId/workouts', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const userDoc = await db.collection('users').doc(userId).get();
-    
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userData = userDoc.data();
-    res.json({
-      currentWorkout: userData.currentWorkout || null,
-      lastWorkoutCreated: userData.lastWorkoutCreated || null
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 

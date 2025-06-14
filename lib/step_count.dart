@@ -107,43 +107,13 @@ class _StepCountPageState extends State<StepCountPage> {
           'weeklySteps': _weeklyTotal,
           'lastUpdated': FieldValue.serverTimestamp(),
         });
-
-        // Get fresh user profile data
-        final userDoc =
-            await _firestore.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-          final userData = userDoc.data()!;
-
-          // Create new workout with updated data
-          final workoutService = WorkoutService();
-          final result = await workoutService.createWorkout(
-            userId: user.uid,
-            dailySteps: _currentSteps,
-            age: userData['age'] ?? 25,
-            experience: userData['experience'] ?? 'Beginner',
-            gender: userData['gender'] ?? 'Male',
-            weight: userData['weight']?.toDouble() ?? 70.0,
-          );
-
-          // Navigate to workout page with new suggestions
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => WorkoutPage(
-                  suggestedWorkout: result['workoutPlan'],
-                ),
-              ),
-            );
-          }
-        }
       }
     } catch (e) {
       print('Error updating step count: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating workout: $e'),
+            content: Text('Error updating step count: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -236,34 +206,8 @@ class _StepCountPageState extends State<StepCountPage> {
                     'lastUpdated': FieldValue.serverTimestamp(),
                   });
 
-                  // Get fresh user profile data
-                  final userDoc =
-                      await _firestore.collection('users').doc(user.uid).get();
-                  if (userDoc.exists) {
-                    final userData = userDoc.data()!;
-
-                    // Create new workout with updated data
-                    final workoutService = WorkoutService();
-                    final result = await workoutService.createWorkout(
-                      userId: user.uid,
-                      dailySteps: steps,
-                      age: userData['age'] ?? 25,
-                      experience: userData['experience'] ?? 'Beginner',
-                      gender: userData['gender'] ?? 'Male',
-                      weight: userData['weight']?.toDouble() ?? 70.0,
-                    );
-
-                    if (mounted) {
-                      Navigator.pop(context); // Close the dialog
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => WorkoutPage(
-                            suggestedWorkout: result['workoutPlan'],
-                          ),
-                        ),
-                      );
-                    }
+                  if (mounted) {
+                    Navigator.pop(context); // Close the dialog
                   }
                 }
               } catch (e) {

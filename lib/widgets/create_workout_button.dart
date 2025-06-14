@@ -3,35 +3,29 @@ import '../services/workout_service.dart';
 
 class CreateWorkoutButton extends StatelessWidget {
   final String userId;
-  final int dailySteps;
-  final int age;
-  final String experience;
-  final String gender;
-  final double weight;
   final Function(Map<String, dynamic>) onWorkoutCreated;
 
   const CreateWorkoutButton({
     Key? key,
     required this.userId,
-    required this.dailySteps,
-    required this.age,
-    required this.experience,
-    required this.gender,
-    required this.weight,
     required this.onWorkoutCreated,
   }) : super(key: key);
 
   Future<void> _createWorkout(BuildContext context) async {
     try {
+      print('\n=== Create Workout Button Clicked ===');
+      print('User ID being passed: $userId');
+
+      if (userId.isEmpty) {
+        throw Exception('User ID is empty');
+      }
+
       final workoutService = WorkoutService();
-      final result = await workoutService.createWorkout(
-        userId: userId,
-        dailySteps: dailySteps,
-        age: age,
-        experience: experience,
-        gender: gender,
-        weight: weight,
-      );
+      print('Calling workout service...');
+
+      // Only send userId to backend
+      final result = await workoutService.createWorkout(userId: userId);
+      print('Workout service response received: $result');
 
       onWorkoutCreated(result);
 
@@ -43,7 +37,10 @@ class CreateWorkoutButton extends StatelessWidget {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Error in _createWorkout: $e');
+      print('Stack trace: $stackTrace');
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

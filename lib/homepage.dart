@@ -383,12 +383,6 @@ class _HomePageState extends State<HomePage> {
                   Center(
                     child: CreateWorkoutButton(
                       userId: userId ?? '',
-                      dailySteps: _currentSteps,
-                      age: 22, // Replace with actual user age from profile
-                      experience:
-                          'Intermediate', // Replace with actual user experience
-                      gender: 'Male', // Replace with actual user gender
-                      weight: 65, // Replace with actual user weight
                       onWorkoutCreated: (result) {
                         Navigator.push(
                           context,
