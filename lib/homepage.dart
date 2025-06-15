@@ -10,6 +10,9 @@ import 'step_count.dart';
 import 'workout.dart';
 import 'widgets/create_workout_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'services/step_counter_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -19,13 +22,9 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0; // Track the selected index
   int _current = 0; // Track current carousel page
-  int _currentSteps = 0;
   final int dailyGoal = 10000;
-  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
-  double _lastMagnitude = 0;
-  double _threshold = 12.0; // Adjust this threshold based on testing
-  bool _isStep = false;
-  DateTime? _lastStepTime;
+  late StepCounterService _stepService;
+  DateTime? _lastResetDate;
 
   // List of widgets for each tab
   late final List<Widget> _widgetOptions;
@@ -33,7 +32,10 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _initAccelerometer();
+    _stepService = StepCounterService();
+    _checkAndResetDailySteps().then((_) {
+      _stepService.start();
+    });
     _widgetOptions = <Widget>[
       Text('Home Screen'), // Replace with your Home widget
       Text('Search Screen'), // Replace with your Search widget
@@ -81,34 +83,9 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
-  void _initAccelerometer() {
-    _accelerometerSubscription = accelerometerEvents.listen((
-      AccelerometerEvent event,
-    ) {
-      // Calculate the magnitude of acceleration
-      double magnitude = sqrt(
-        event.x * event.x + event.y * event.y + event.z * event.z,
-      );
-
-      // Simple step detection algorithm
-      if (!_isStep && magnitude > _threshold && _lastMagnitude <= _threshold) {
-        // Check if enough time has passed since the last step (debouncing)
-        if (_lastStepTime == null ||
-            DateTime.now().difference(_lastStepTime!).inMilliseconds > 300) {
-          setState(() {
-            _currentSteps++;
-            _lastStepTime = DateTime.now();
-          });
-        }
-      }
-
-      _lastMagnitude = magnitude;
-    });
-  }
-
   @override
   void dispose() {
-    _accelerometerSubscription?.cancel();
+    _stepService.stop();
     super.dispose();
   }
 
@@ -122,28 +99,48 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final userId = user?.uid;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      backgroundColor: Color(0xFF008000), // Background color
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(
-          'ThatsFit',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'DM Sans',
-          ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Row(
+          children: [
+            // Logo
+            Container(
+              height: 38,
+              width: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Image.asset(
+                  'assets/PNG/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'ThatsFit',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
+                letterSpacing: 1.1,
+              ),
+            ),
+          ],
         ),
-        backgroundColor: Color(0xFF008000),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
-            onPressed: _initAccelerometer,
-          ),
-          IconButton(
-            icon: Icon(Icons.person, size: 40),
+            icon: Icon(Icons.person, color: Colors.white, size: 28),
             onPressed: () {
-              // Handle user profile action
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => ProfilePage()),
@@ -152,281 +149,326 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            // Step Count Section
-            Column(
-              children: [
-                SizedBox(height: 10),
-                CarouselSlider.builder(
-                  itemCount: 3,
-                  options: CarouselOptions(
-                    height: 160,
-                    viewportFraction: 1.0,
-                    enlargeCenterPage: false,
-                    scrollDirection: Axis.horizontal,
-                    onPageChanged: (index, reason) {
-                      setState(() {
-                        _current = index;
-                      });
-                    },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _stepService.stepStream(),
+            builder: (context, snapshot) {
+              int steps = 0;
+              if (snapshot.hasData && snapshot.data!.data() != null) {
+                steps = snapshot.data!.data()!['dailySteps'] ?? 0;
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Greeting
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, bottom: 18),
+                    child: Text(
+                      'Welcome back!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                  itemBuilder: (context, index, realIndex) {
-                    if (index == 0) {
-                      return Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.zero,
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFbfbfbf),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Step Count',
-                              style: TextStyle(
-                                fontSize: 25,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'DM Sans',
-                              ),
+                  // Step Count Card
+                  Card(
+                    color: Color(0xFF232323),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(18.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Step Count',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Poppins',
+                              color: Colors.white,
                             ),
-                            SizedBox(height: 15),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  child: CircularProgressIndicator(
-                                    value: _currentSteps / dailyGoal,
-                                    backgroundColor: Colors.grey,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF33443c),
-                                    ),
-                                    strokeWidth: 10,
-                                  ),
+                          ),
+                          SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              TweenAnimationBuilder<double>(
+                                tween: Tween<double>(
+                                  begin: 0,
+                                  end: steps / dailyGoal,
                                 ),
-                                SizedBox(width: 20),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$_currentSteps',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'DM Sans',
+                                duration: Duration(milliseconds: 800),
+                                builder: (context, value, child) {
+                                  return SizedBox(
+                                    width: 70,
+                                    height: 70,
+                                    child: CircularProgressIndicator(
+                                      value: value,
+                                      backgroundColor: Colors.grey[800],
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF6e9277),
                                       ),
+                                      strokeWidth: 8,
                                     ),
-                                    Text(
-                                      'steps',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontFamily: 'DM Sans',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(width: 20),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => StepCountPage(),
-                                      ),
-                                    );
-                                  },
-                                  child: Text(
-                                    'View More',
+                                  );
+                                },
+                              ),
+                              SizedBox(width: 18),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$steps',
                                     style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: 'DM Sans',
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontFamily: 'Poppins',
                                     ),
                                   ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Color(0xFF6e9277),
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 15,
+                                  Text(
+                                    'steps',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white70,
+                                      fontFamily: 'Inter',
                                     ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(width: 18),
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Color(0xFF6e9277)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  backgroundColor: Colors.transparent,
+                                ),
+                                onPressed: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => StepCountPage(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  'View More',
+                                  style: TextStyle(
+                                    color: Color(0xFF6e9277),
+                                    fontFamily: 'Inter',
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 18),
+                  // Daily Goal & Weekly Progress Cards
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Card(
+                          color: Color(0xFF33443c),
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 18, horizontal: 10),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Daily Goal',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '${steps.clamp(0, dailyGoal)} / $dailyGoal',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontFamily: 'Inter',
                                   ),
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
-                      );
-                    } else if (index == 1) {
-                      return Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.zero,
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFbfbfbf),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Daily Goal',
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                            SizedBox(height: 15),
-                            Text(
-                              '7000 / 10000',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                            Text(
-                              'steps',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    } else {
-                      return Container(
-                        width: double.infinity,
-                        margin: EdgeInsets.zero,
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFbfbfbf),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Weekly Progress',
-                              style: TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                            SizedBox(height: 15),
-                            Text(
-                              '35,000 steps',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                            Text(
-                              'Great progress!',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontFamily: 'DM Sans',
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  },
-                ),
-                SizedBox(height: 10), // Space between carousel and dots
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [0, 1, 2].map((index) {
-                    return Container(
-                      width: 8.0,
-                      height: 8.0,
-                      margin: EdgeInsets.symmetric(horizontal: 4.0),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _current == index
-                            ? Color(0xFF33443c) // Active dot color
-                            : Colors.white.withOpacity(
-                                0.4,
-                              ), // Inactive dot color
                       ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            // New Container for Create Workout Button
-            Container(
-              padding: EdgeInsets.all(20),
-              height: 400,
-              width: 500,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: AssetImage('assets/JPG/workout_image.jpg'),
-                  fit: BoxFit.cover,
-                ),
-                color: Color(0xFFbfbfbf),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Center(
-                    child: CreateWorkoutButton(
-                      userId: userId ?? '',
-                      onWorkoutCreated: (result) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WorkoutPage(
-                              suggestedWorkout: result['workoutPlan'],
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Card(
+                          color: Color(0xFF33443c),
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 18, horizontal: 10),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Weekly Progress',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '35,000 steps',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    fontFamily: 'Inter',
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 22),
+                  // Create Workout Card
+                  Card(
+                    color: Colors.white,
+                    elevation: 7,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      constraints: BoxConstraints(
+                        maxWidth: 500,
+                        minHeight: 180,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        image: DecorationImage(
+                          image: AssetImage('assets/JPG/workout_image.jpg'),
+                          fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(
+                            Colors.black.withOpacity(0.18),
+                            BlendMode.darken,
+                          ),
+                        ),
+                      ),
+                      child: Container(
+                        padding: EdgeInsets.all(24),
+                        alignment: Alignment.bottomCenter,
+                        child: CreateWorkoutButton(
+                          userId: userId ?? '',
+                          onWorkoutCreated: (result) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => WorkoutPage(
+                                  suggestedWorkout: result['workoutPlan'],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ),
+                  SizedBox(height: 18),
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
       bottomNavigationBar: Container(
-        color: Color(0xFF008000), // Background color of the navigation bar
+        color: Colors.black,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: GNav(
             gap: 8,
-            color: Colors.white, // Color for unselected items
-            activeColor: Colors.white, // Color for selected item
+            color: Colors.white,
+            activeColor: Colors.white,
             iconSize: 24,
             padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
             duration: Duration(milliseconds: 400),
-            tabBackgroundColor:
-                Colors.green, // Background color for selected tab
+            tabBackgroundColor: Color(0xFF6e9277),
             tabs: [
               GButton(icon: Icons.home, text: 'Home'),
               GButton(icon: Icons.search, text: 'Search'),
               GButton(icon: Icons.arrow_back, text: 'Back'),
               GButton(icon: Icons.logout, text: 'Logout'),
             ],
-            selectedIndex: _selectedIndex, // Set the current index
+            selectedIndex: _selectedIndex,
             onTabChange: (index) {
-              _onItemTapped(index); // Handle tab change
+              _onItemTapped(index);
             },
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _checkAndResetDailySteps() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final lastResetDate = (data['lastResetDate'] as Timestamp?)?.toDate();
+        final now = DateTime.now();
+
+        if (lastResetDate == null ||
+            lastResetDate.year != now.year ||
+            lastResetDate.month != now.month ||
+            lastResetDate.day != now.day) {
+          final currentWeeklyTotal = data['weeklySteps'] ?? 0;
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'dailySteps': 0,
+            'lastResetDate': FieldValue.serverTimestamp(),
+            'weeklySteps': currentWeeklyTotal,
+          });
+
+          setState(() {
+            _lastResetDate = now;
+          });
+        } else {
+          setState(() {
+            _lastResetDate = lastResetDate;
+          });
+        }
+      }
+    }
   }
 }
