@@ -26,15 +26,103 @@ async function fetchLatestUserData(userId) {
 
         // Return all data in a single data object
         const flowiseData = {
-            age: userData.age,
-            weight: userData.weight,
-            gender: userData.gender,
-            trainingExperience: userData.trainingExperience,
-            stepCount: latestStepCount
+            stepCount: latestStepCount,
+            trainingExperience: userData.experience,
+            currentDay: userData.currentDay || 'Monday'
         };
 
         console.log('\nFinal data being sent to Flowise:', flowiseData);
-        return { flowiseData };
+
+        // Create the prompt template with actual user data
+        const promptTemplate = `User Information:
+- Step Count = ${flowiseData.stepCount}
+- Training Experience = ${flowiseData.trainingExperience}
+- Current Day = ${flowiseData.currentDay}
+
+Step Count Guidelines:
+- < 5000 steps: High intensity workout (more reps and sets)
+- 5000-7000 steps: Moderate intensity workout
+- 7000-10000 steps: Light intensity workout (fewer reps and sets)
+
+Rest Period Guidelines Based On Training Experience:
+- Beginner: Longer rest periods (90-120 seconds)
+- Intermediate: Moderate rest periods (60-90 seconds)
+- Expert: Shorter rest periods (30-60 seconds)
+
+Workout Schedule Based On Current Day:
+- Monday: Back and Biceps
+- Tuesday: Chest and Triceps
+- Wednesday: Legs
+- Thursday: Shoulders, Triceps, and Biceps
+- Friday: Chest and Back
+- Saturday: Legs
+- Sunday: Shoulders
+
+Please provide a detailed workout plan that includes:
+1. Exercise name
+2. Sets and reps (adjusted based on step count)
+3. Rest periods (adjusted based on experience level)
+4. Brief form tips
+
+Format the response in a clear, structured way that's easy to read.
+Please format the response as:
+
+Workout Plan:
+1. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+
+2. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+...`;
+
+        // Send the prompt template to Flowise
+        console.log('Preparing to call Flowise with prompt template');
+        const response = await query({
+            question: promptTemplate
+        });
+        console.log('Flowise response received:', response);
+
+        // Parse the workout plan text
+        const workoutText = response.text;
+        
+        // Extract workout summary
+        const workoutSummary = {
+            title: `${flowiseData.currentDay}'s Workout Plan`,
+            subtitle: `For ${flowiseData.trainingExperience} Level`,
+            intensity: flowiseData.stepCount < 5000 ? 'High Intensity' : 
+                     flowiseData.stepCount > 7000 ? 'Light Intensity' : 'Moderate Intensity',
+            stepCount: flowiseData.stepCount,
+            restPeriods: flowiseData.trainingExperience === 'Beginner' ? '90-120 seconds' :
+                        flowiseData.trainingExperience === 'Intermediate' ? '60-90 seconds' : '30-60 seconds'
+        };
+
+        // Parse exercises into a clean format
+        const exercises = [];
+        const exerciseRegex = /\d+\.\s*([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)/g;
+        let match;
+        
+        while ((match = exerciseRegex.exec(workoutText)) !== null) {
+            exercises.push({
+                name: match[1].trim(),
+                details: {
+                    setsAndReps: match[2].trim().replace(/^-\s*/, ''),
+                    restPeriod: match[3].trim().replace(/^-\s*/, ''),
+                    formTips: match[4].trim().replace(/^-\s*/, '')
+                }
+            });
+        }
+
+        // Create the final structured response
+        const formattedResponse = {
+            summary: workoutSummary,
+            exercises: exercises
+        };
+
+        return { workoutPlan: formattedResponse };
     } catch (error) {
         console.error('Error fetching latest user data:', error);
         throw error;
@@ -77,21 +165,13 @@ async function getWorkoutRecommendation(userId) {
     try {
         console.log('\n=== Starting Workout Recommendation Process ===');
         
-        // Get the user data
-        const userData = await fetchLatestUserData(userId);
-        console.log('User data fetched successfully');
+        // Get the user data and workout plan
+        const { workoutPlan } = await fetchLatestUserData(userId);
+        console.log('Workout plan fetched successfully');
         
-        // Send the raw flowiseData to Flowise
-        console.log('Preparing to call Flowise with data:', userData.flowiseData);
-        const response = await query({
-            question: userData.flowiseData
-        });
-        console.log('Flowise response received:', response);
-
         return {
             message: 'Workout recommendation generated successfully',
-            workoutPlan: response,
-            userData: userData.flowiseData
+            workoutPlan: workoutPlan
         };
     } catch (error) {
         console.error('Error getting workout recommendation:', error);

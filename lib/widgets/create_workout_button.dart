@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/workout_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CreateWorkoutButton extends StatelessWidget {
   final String userId;
@@ -11,6 +13,20 @@ class CreateWorkoutButton extends StatelessWidget {
     required this.onWorkoutCreated,
   }) : super(key: key);
 
+  String _getCurrentDay() {
+    final now = DateTime.now();
+    final days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    return days[now.weekday - 1]; // weekday returns 1-7, where 1 is Monday
+  }
+
   Future<void> _createWorkout(BuildContext context) async {
     try {
       print('\n=== Create Workout Button Clicked ===');
@@ -18,6 +34,20 @@ class CreateWorkoutButton extends StatelessWidget {
 
       if (userId.isEmpty) {
         throw Exception('User ID is empty');
+      }
+
+      // Get current day and update Firebase
+      final currentDay = _getCurrentDay();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'currentDay': currentDay,
+          'lastWorkoutDay': FieldValue.serverTimestamp(),
+        });
+        print('Updated current day in Firebase: $currentDay');
       }
 
       final workoutService = WorkoutService();
