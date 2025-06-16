@@ -27,11 +27,10 @@ class _EditProfile1State extends State<EditProfile1> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final doc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
         if (doc.exists) {
           setState(() {
@@ -168,10 +167,10 @@ class _EditProfile1State extends State<EditProfile1> {
             .collection('users')
             .doc(user.uid)
             .update({
-              'name': _nameController.text.trim(),
-              'username': _usernameController.text.trim(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+          'name': _nameController.text.trim(),
+          'username': _usernameController.text.trim(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile updated successfully!')),
@@ -195,161 +194,204 @@ class _EditProfile1State extends State<EditProfile1> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 360;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          color: Colors.black,
-          image: DecorationImage(
-            image: AssetImage('assets/PNG/background.png'),
-            fit: BoxFit.cover,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
+            ],
           ),
         ),
-        child: Column(
-          children: [
-            // Back Button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () {
-                    Navigator.pop(context); // Go back to the previous page
-                  },
-                ),
-              ),
-            ),
-            Expanded(flex: 1, child: Container()),
-            Expanded(
-              flex: 0,
-              child: Container(
-                margin: EdgeInsets.zero,
-                height: 550,
-                width: 500,
-                child: Card(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
-                    ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new,
+                            color: Colors.white, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Edit Profile',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 24 : 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
-                  elevation: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          margin: EdgeInsets.all(30),
-                          child: Text(
-                            'Edit Profile',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'aileron',
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        // Email Field
-                        TextField(
-                          controller: _emailController,
-                          decoration: InputDecoration(
-                            labelText: 'Email',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Password Field
-                        TextField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Name Field
-                        TextField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: 'Name',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Username Field
-                        TextField(
-                          controller: _usernameController,
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 15),
-                        // Save Button
-                        Container(
-                          margin: EdgeInsets.all(20),
-                          child: ElevatedButton(
-                            onPressed:
-                                _isLoading ? null : () => _saveProfile(context),
-                            child:
-                                _isLoading
-                                    ? CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    )
-                                    : Text(
-                                      'Save Profile',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontFamily: 'DM Sans',
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF6e9277),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 40,
-                                vertical: 10,
+                ),
+
+                // Profile Form Section
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Picture Section (Optional)
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF6e9277).withOpacity(0.2),
+                                border: Border.all(
+                                  color: Color(0xFF6e9277),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Color(0xFF6e9277),
                               ),
                             ),
-                          ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF6e9277),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.camera_alt,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: 30),
+
+                      // Form Fields
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'Email',
+                        icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        icon: Icons.lock_outline,
+                        isPassword: true,
+                      ),
+                      SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _nameController,
+                        label: 'Full Name',
+                        icon: Icons.person_outline,
+                      ),
+                      SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _usernameController,
+                        label: 'Username',
+                        icon: Icons.alternate_email,
+                      ),
+                      SizedBox(height: 30),
+
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed:
+                              _isLoading ? null : () => _saveProfile(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF6e9277),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  'Save Changes',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword,
+        keyboardType: keyboardType,
+        style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontFamily: 'Poppins',
+          ),
+          prefixIcon: Icon(icon, color: Color(0xFF6e9277)),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
       ),
     );

@@ -13,9 +13,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _weightController = TextEditingController();
   String _selectedGender = 'Male';
   String _selectedExperience = 'Beginner';
-  
+
   final List<String> _genders = ['Male', 'Female'];
-  final List<String> _experienceLevels = ['Beginner', 'Intermediate', 'Advanced'];
+  final List<String> _experienceLevels = [
+    'Beginner',
+    'Intermediate',
+    'Advanced'
+  ];
 
   @override
   void initState() {
@@ -68,28 +72,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       if (age == null || weight == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter valid numbers for age and weight')),
+          SnackBar(
+              content: Text('Please enter valid numbers for age and weight')),
         );
         return;
       }
 
       if (age < 13 || age > 100) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter a valid age between 13 and 100')),
+          SnackBar(
+              content: Text('Please enter a valid age between 13 and 100')),
         );
         return;
       }
 
       if (weight < 30 || weight > 300) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please enter a valid weight between 30 and 300 kg')),
+          SnackBar(
+              content:
+                  Text('Please enter a valid weight between 30 and 300 kg')),
         );
         return;
       }
 
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
           'age': age,
           'weight': weight,
           'gender': _selectedGender,
@@ -116,181 +127,202 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 360;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          color: Colors.black,
-          image: DecorationImage(
-            image: AssetImage('assets/PNG/background.png'),
-            fit: BoxFit.cover,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
+            ],
           ),
         ),
-        child: Column(
-          children: [
-            // Back Button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-            Expanded(flex: 1, child: Container()),
-            Expanded(
-              flex: 0,
-              child: Container(
-                margin: EdgeInsets.zero,
-                height: 550,
-                width: 500,
-                child: Card(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
-                    ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new,
+                            color: Colors.white, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        'Additional Info',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 24 : 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
                   ),
-                  elevation: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          margin: EdgeInsets.all(30),
-                          child: Text(
-                            'Edit Profile',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'aileron',
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        // Age Field
-                        TextField(
-                          controller: _ageController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Age',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Weight Field
-                        TextField(
-                          controller: _weightController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Weight (kg)',
-                            labelStyle: TextStyle(fontFamily: 'DM Sans'),
-                            filled: true,
-                            fillColor: Color(0xFFE0E0E0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Gender Dropdown
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            color: Color(0xFFE0E0E0),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedGender,
-                              isExpanded: true,
-                              items: _genders.map((String gender) {
-                                return DropdownMenuItem<String>(
-                                  value: gender,
-                                  child: Text(
-                                    gender,
-                                    style: TextStyle(fontFamily: 'DM Sans'),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                if (newValue != null) {
-                                  setState(() {
-                                    _selectedGender = newValue;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        // Experience Level Dropdown
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            color: Color(0xFFE0E0E0),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedExperience,
-                              isExpanded: true,
-                              items: _experienceLevels.map((String level) {
-                                return DropdownMenuItem<String>(
-                                  value: level,
-                                  child: Text(
-                                    level,
-                                    style: TextStyle(fontFamily: 'DM Sans'),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                if (newValue != null) {
-                                  setState(() {
-                                    _selectedExperience = newValue;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 30),
-                        // Save Button
-                        ElevatedButton(
+                ),
+
+                // Profile Form Section
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Form Fields
+                      _buildTextField(
+                        controller: _ageController,
+                        label: 'Age',
+                        icon: Icons.calendar_today_outlined,
+                        keyboardType: TextInputType.number,
+                      ),
+                      SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _weightController,
+                        label: 'Weight (kg)',
+                        icon: Icons.monitor_weight_outlined,
+                        keyboardType: TextInputType.number,
+                      ),
+                      SizedBox(height: 16),
+                      _buildDropdown(
+                        value: _selectedGender,
+                        label: 'Gender',
+                        icon: Icons.people_outline,
+                        items: _genders,
+                        onChanged: (String? value) {
+                          if (value != null) {
+                            setState(() => _selectedGender = value);
+                          }
+                        },
+                      ),
+                      SizedBox(height: 16),
+                      _buildDropdown(
+                        value: _selectedExperience,
+                        label: 'Experience Level',
+                        icon: Icons.fitness_center_outlined,
+                        items: _experienceLevels,
+                        onChanged: (String? value) {
+                          if (value != null) {
+                            setState(() => _selectedExperience = value);
+                          }
+                        },
+                      ),
+                      SizedBox(height: 30),
+
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
                           onPressed: () => _updateProfile(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF6e9277),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
                           child: Text(
                             'Save Changes',
                             style: TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'DM Sans',
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF6e9277),
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 40,
-                              vertical: 15,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Poppins',
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontFamily: 'Poppins',
+          ),
+          prefixIcon: Icon(icon, color: Color(0xFF6e9277)),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown({
+    required String value,
+    required String label,
+    required IconData icon,
+    required List<String> items,
+    required Function(String?) onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          dropdownColor: Color(0xFF1A1A1A),
+          icon: Icon(Icons.arrow_drop_down, color: Color(0xFF6e9277)),
+          style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+          items: items.map((String item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Icon(icon, color: Color(0xFF6e9277), size: 20),
+                    SizedBox(width: 12),
+                    Text(item),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
         ),
       ),
     );
