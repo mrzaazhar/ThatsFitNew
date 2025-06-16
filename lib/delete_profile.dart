@@ -6,104 +6,176 @@ import 'main.dart';
 class DeleteProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 360;
+
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.black,
-          image: DecorationImage(
-            image: AssetImage('assets/PNG/background.png'),
-            fit: BoxFit.cover,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
+            ],
           ),
         ),
-        child: Column(
-          children: [
-            // Back Button
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header Section
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new,
+                          color: Colors.white, size: 22),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Delete Account',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 24 : 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Expanded(flex: 1, child: Container()),
-            Expanded(
-              flex: 0,
-              child: Container(
-                margin: EdgeInsets.zero,
-                height: 400,
-                width: 500,
-                child: Card(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
+
+              // Warning Card
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Container(
+                    margin: EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
                     ),
-                  ),
-                  elevation: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Warning Icon
                         Container(
-                          margin: EdgeInsets.all(30),
-                          child: Text(
-                            'Delete Account',
-                            style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'aileron',
-                            ),
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                        SizedBox(height: 20),
-                        Text(
-                          'Are you sure you want to delete your account?',
-                          style: TextStyle(fontSize: 16, fontFamily: 'DM Sans'),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'This action cannot be undone. All your data will be permanently deleted.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontFamily: 'DM Sans',
+                          child: Icon(
+                            Icons.warning_rounded,
+                            size: 40,
                             color: Colors.red,
                           ),
+                        ),
+                        SizedBox(height: 24),
+
+                        // Warning Text
+                        Text(
+                          'Delete Your Account',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 20 : 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        SizedBox(height: 16),
+
+                        Text(
+                          'Are you sure you want to delete your account?',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white.withOpacity(0.9),
+                            fontFamily: 'Poppins',
+                            height: 1.5,
+                          ),
                           textAlign: TextAlign.center,
                         ),
-                        SizedBox(height: 40),
-                        // Delete Button
-                        ElevatedButton(
-                          onPressed:
-                              () => _showDeleteConfirmationDialog(context),
-                          child: Text(
-                            'Delete Account',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontFamily: 'DM Sans',
-                              color: Colors.white,
-                            ),
+                        SizedBox(height: 12),
+
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border:
+                                Border.all(color: Colors.red.withOpacity(0.3)),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 40,
-                              vertical: 15,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.red,
+                                size: 24,
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'This action cannot be undone. All your data will be permanently deleted.',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.red,
+                                    fontFamily: 'Poppins',
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 32),
+
+                        // Delete Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () =>
+                                _showDeleteConfirmationDialog(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.delete_outline, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Delete Account',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                        SizedBox(height: MediaQuery.of(context).padding.bottom),
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -115,21 +187,66 @@ class DeleteProfilePage extends StatelessWidget {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirm Deletion'),
-          content: Text(
-            'Are you absolutely sure you want to delete your account? This action cannot be undone. You will need to create a new account to access ThatsFit again.',
+          backgroundColor: Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.warning_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 12),
+              Text(
+                'Confirm Deletion',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Are you absolutely sure you want to delete your account? This action cannot be undone. You will need to create a new account to access ThatsFit again.',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontFamily: 'Poppins',
+                ),
+              ),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteAccount(context);
               },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                'Delete',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         );
