@@ -42,9 +42,30 @@ class HealthConnectService {
     }
   }
 
+  /// Check if permissions are already granted
+  Future<bool> hasPermissions() async {
+    try {
+      final types = [HealthDataType.STEPS];
+      final hasAuth = await _health
+          .hasPermissions(types, permissions: [HealthDataAccess.READ]);
+      print('$_tag: Has permissions: ${hasAuth ?? false}');
+      return hasAuth ?? false;
+    } catch (e) {
+      print('$_tag: Error checking permissions: $e');
+      return false;
+    }
+  }
+
   /// Request permissions for steps data
   Future<bool> requestPermissions() async {
     try {
+      // First check if permissions are already granted
+      final alreadyGranted = await hasPermissions();
+      if (alreadyGranted) {
+        print('$_tag: Health Connect permissions already granted');
+        return true;
+      }
+
       // Request activity recognition permission first
       final activityStatus = await Permission.activityRecognition.request();
       if (!activityStatus.isGranted) {

@@ -23,6 +23,11 @@ class _StepCountPageState extends State<StepCountPage> {
   bool _healthConnectAvailable = false;
   bool _healthConnectInitialized = false;
   String _healthConnectStatus = 'Not initialized';
+  bool _isLoading = true;
+  DateTime? _lastUpdated;
+
+  // Stream subscription for Health Connect updates
+  StreamSubscription<int>? _healthConnectSubscription;
 
   // Add responsive helper methods
   bool _isSmallScreen(BuildContext context) =>
@@ -61,11 +66,85 @@ class _StepCountPageState extends State<StepCountPage> {
         : (_isMediumScreen(context) ? medium : large);
   }
 
+  // Helper methods to calculate metrics from step count
+  int _calculateCalories(int steps) {
+    // Average person burns about 0.04 calories per step
+    return (steps * 0.04).round();
+  }
+
+  double _calculateDistance(int steps) {
+    // Average step length is about 0.762 meters (30 inches)
+    return (steps * 0.762 / 1000); // Convert to kilometers
+  }
+
+  String _formatDistance(double distanceKm) {
+    if (distanceKm < 1) {
+      return '${(distanceKm * 1000).round()} m';
+    } else {
+      return '${distanceKm.toStringAsFixed(1)} km';
+    }
+  }
+
+  String _calculateTimeActive(int steps) {
+    // Assuming average walking speed of 100 steps per minute
+    final minutes = (steps / 100).round();
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+
+    if (hours > 0) {
+      return '${hours}h ${remainingMinutes}m';
+    } else {
+      return '${remainingMinutes}m';
+    }
+  }
+
+  String _formatLastUpdated(DateTime? lastUpdated) {
+    if (lastUpdated == null) return 'Never';
+
+    final now = DateTime.now();
+    final difference = now.difference(lastUpdated);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _checkAndResetDailySteps().then((_) => _loadInitialSteps());
-    _initHealthConnect();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Initialize Health Connect first
+      await _initHealthConnect();
+
+      // Then load initial data
+      await _checkAndResetDailySteps();
+      await _loadInitialSteps();
+
+      // Calculate weekly total from Health Connect if available
+      if (_healthConnectAvailable) {
+        await _loadWeeklyStepsFromHealthConnect();
+      }
+    } catch (e) {
+      print('Error initializing app: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _initHealthConnect() async {
@@ -91,23 +170,84 @@ class _StepCountPageState extends State<StepCountPage> {
     }
   }
 
+  Future<void> _loadWeeklyStepsFromHealthConnect() async {
+    try {
+      final now = DateTime.now();
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final startOfWeekDay =
+          DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
+      final weeklySteps = await _healthConnectService.getStepCountForDateRange(
+          startOfWeekDay, now);
+
+      setState(() {
+        _weeklyTotal = weeklySteps;
+      });
+
+      // Update Firestore with the weekly total
+      await _updateStepCountInFirestore(_currentSteps, weeklySteps);
+    } catch (e) {
+      print('Error loading weekly steps from Health Connect: $e');
+    }
+  }
+
   Future<void> _startHealthConnectMonitoring() async {
     try {
-      final permissionsGranted =
-          await _healthConnectService.requestPermissions();
-      if (permissionsGranted) {
+      // First check if permissions are already granted
+      final hasPermissions = await _healthConnectService.hasPermissions();
+      if (hasPermissions) {
+        print('Health Connect permissions already granted');
+        setState(() {
+          _healthConnectStatus = 'Permissions granted';
+        });
+
+        // Start monitoring
         await _healthConnectService.startStepCountMonitoring();
 
         // Get initial step count from Health Connect
         final steps = await _healthConnectService.getTodayStepCount();
         setState(() {
           _currentSteps = steps;
+          _lastUpdated = DateTime.now();
         });
 
         // Listen to Health Connect updates
-        _healthConnectService.stepCountStream.listen((steps) {
+        _healthConnectSubscription =
+            _healthConnectService.stepCountStream.listen((steps) {
           setState(() {
             _currentSteps = steps;
+            _lastUpdated = DateTime.now();
+          });
+          _updateStepCountInFirestore(steps, _weeklyTotal);
+        });
+
+        return;
+      }
+
+      // If permissions not granted, request them
+      final permissionsGranted =
+          await _healthConnectService.requestPermissions();
+      if (permissionsGranted) {
+        setState(() {
+          _healthConnectStatus = 'Permissions granted';
+        });
+
+        // Start monitoring after permissions are granted
+        await _healthConnectService.startStepCountMonitoring();
+
+        // Get initial step count from Health Connect
+        final steps = await _healthConnectService.getTodayStepCount();
+        setState(() {
+          _currentSteps = steps;
+          _lastUpdated = DateTime.now();
+        });
+
+        // Listen to Health Connect updates
+        _healthConnectSubscription =
+            _healthConnectService.stepCountStream.listen((steps) {
+          setState(() {
+            _currentSteps = steps;
+            _lastUpdated = DateTime.now();
           });
           _updateStepCountInFirestore(steps, _weeklyTotal);
         });
@@ -117,8 +257,14 @@ class _StepCountPageState extends State<StepCountPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Health Connect permissions not granted. Please grant permissions in Health Connect app.')),
+            content: Text(
+                'Health Connect permissions not granted. Please:\n1. Open Health Connect app\n2. Go to Apps and devices\n3. Enable Steps for this app'),
+            duration: Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Try Again',
+              onPressed: () => _requestPermissions(),
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -126,7 +272,10 @@ class _StepCountPageState extends State<StepCountPage> {
         _healthConnectStatus = 'Error: $e';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error starting Health Connect: $e')),
+        SnackBar(
+          content: Text('Error starting Health Connect: $e'),
+          duration: Duration(seconds: 5),
+        ),
       );
     }
   }
@@ -180,14 +329,28 @@ class _StepCountPageState extends State<StepCountPage> {
   Future<void> _refreshStepCount() async {
     if (_healthConnectAvailable) {
       try {
+        setState(() {
+          _isLoading = true;
+        });
+
         final steps = await _healthConnectService.getTodayStepCount();
         setState(() {
           _currentSteps = steps;
+          _lastUpdated = DateTime.now();
+          _isLoading = false;
         });
+
+        // Also refresh weekly total
+        await _loadWeeklyStepsFromHealthConnect();
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Step count refreshed!')),
         );
       } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+
         String errorMessage = 'Error refreshing step count';
 
         // Check if it's a permission error
@@ -278,8 +441,35 @@ class _StepCountPageState extends State<StepCountPage> {
     }
   }
 
+  /// Debug method to help troubleshoot Health Connect issues
+  Future<void> _debugHealthConnect() async {
+    try {
+      print('=== Health Connect Debug Info ===');
+
+      final available = await _healthConnectService.isAvailable();
+      print('Health Connect available: $available');
+
+      final hasPerms = await _healthConnectService.hasPermissions();
+      print('Has permissions: $hasPerms');
+
+      if (hasPerms) {
+        try {
+          final steps = await _healthConnectService.getTodayStepCount();
+          print('Today steps: $steps');
+        } catch (e) {
+          print('Error getting steps: $e');
+        }
+      }
+
+      print('=== End Debug Info ===');
+    } catch (e) {
+      print('Debug error: $e');
+    }
+  }
+
   @override
   void dispose() {
+    _healthConnectSubscription?.cancel();
     _healthConnectService.dispose();
     super.dispose();
   }
@@ -304,127 +494,157 @@ class _StepCountPageState extends State<StepCountPage> {
           ),
         ),
         child: SafeArea(
-          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: user != null
-                ? _firestore.collection('users').doc(user.uid).snapshots()
-                : const Stream.empty(),
-            builder: (context, snapshot) {
-              int steps = _currentSteps;
-              int weeklyTotal = _weeklyTotal;
-              if (snapshot.hasData && snapshot.data!.data() != null) {
-                steps = snapshot.data!.data()!['dailySteps'] ?? steps;
-                weeklyTotal =
-                    snapshot.data!.data()!['weeklySteps'] ?? weeklyTotal;
-              }
+          child: _isLoading
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF6e9277),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Loading step data...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: user != null
+                      ? _firestore.collection('users').doc(user.uid).snapshots()
+                      : const Stream.empty(),
+                  builder: (context, snapshot) {
+                    int steps = _currentSteps;
+                    int weeklyTotal = _weeklyTotal;
 
-              return Column(
-                children: [
-                  // Custom App Bar
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _isLandscape(context) ? 16 : 20,
-                      vertical: _isLandscape(context) ? 10 : 15,
-                    ),
-                    child: Row(
+                    // Only update from Firestore if Health Connect is not available
+                    if (!_healthConnectAvailable &&
+                        snapshot.hasData &&
+                        snapshot.data!.data() != null) {
+                      steps = snapshot.data!.data()!['dailySteps'] ?? steps;
+                      weeklyTotal =
+                          snapshot.data!.data()!['weeklySteps'] ?? weeklyTotal;
+                    }
+
+                    return Column(
                       children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.arrow_back_ios_new,
-                            color: Colors.white,
-                            size: _isLandscape(context) ? 20 : 22,
+                        // Custom App Bar
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _isLandscape(context) ? 16 : 20,
+                            vertical: _isLandscape(context) ? 10 : 15,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: _isLandscape(context) ? 20 : 22,
+                                ),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              SizedBox(width: _isLandscape(context) ? 8 : 10),
+                              Text(
+                                'Step Count',
+                                style: TextStyle(
+                                  fontSize: _getFontSize(context,
+                                      small: 22, medium: 24, large: 28),
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                              Spacer(),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.refresh_rounded,
+                                  color: Colors.white,
+                                  size: _isLandscape(context) ? 20 : 24,
+                                ),
+                                onPressed: _refreshStepCount,
+                              ),
+                            ],
+                          ),
                         ),
-                        SizedBox(width: _isLandscape(context) ? 8 : 10),
-                        Text(
-                          'Step Count',
-                          style: TextStyle(
-                            fontSize: _getFontSize(context,
-                                small: 22, medium: 24, large: 28),
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
+
+                        // Main Content
+                        Expanded(
+                          child: SingleChildScrollView(
+                            physics: BouncingScrollPhysics(),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _isLandscape(context) ? 16 : 20,
+                              ),
+                              child: _isLandscape(context)
+                                  ? Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: _buildDailyProgressCard(
+                                            context,
+                                            steps,
+                                            progressSize,
+                                            cardPadding,
+                                          ),
+                                        ),
+                                        SizedBox(width: 20),
+                                        Expanded(
+                                          child: _buildWeeklyProgressCard(
+                                            context,
+                                            weeklyTotal,
+                                            cardPadding,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildDailyProgressCard(
+                                          context,
+                                          steps,
+                                          progressSize,
+                                          cardPadding,
+                                        ),
+                                        SizedBox(height: 20),
+                                        _buildWeeklyProgressCard(
+                                          context,
+                                          weeklyTotal,
+                                          cardPadding,
+                                        ),
+                                        // Health Connect Status and Permission Button
+                                        if (!_healthConnectAvailable ||
+                                            _healthConnectStatus
+                                                .contains('Error') ||
+                                            _healthConnectStatus
+                                                .contains('not granted'))
+                                          _buildHealthConnectStatusCard(
+                                              context, cardPadding),
+                                        SizedBox(
+                                          height: MediaQuery.of(context)
+                                                  .padding
+                                                  .bottom +
+                                              20,
+                                        ),
+                                      ],
+                                    ),
+                            ),
                           ),
-                        ),
-                        Spacer(),
-                        IconButton(
-                          icon: Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white,
-                            size: _isLandscape(context) ? 20 : 24,
-                          ),
-                          onPressed: _refreshStepCount,
                         ),
                       ],
-                    ),
-                  ),
-
-                  // Main Content
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: BouncingScrollPhysics(),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: _isLandscape(context) ? 16 : 20,
-                        ),
-                        child: _isLandscape(context)
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: _buildDailyProgressCard(
-                                      context,
-                                      steps,
-                                      progressSize,
-                                      cardPadding,
-                                    ),
-                                  ),
-                                  SizedBox(width: 20),
-                                  Expanded(
-                                    child: _buildWeeklyProgressCard(
-                                      context,
-                                      weeklyTotal,
-                                      cardPadding,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildDailyProgressCard(
-                                    context,
-                                    steps,
-                                    progressSize,
-                                    cardPadding,
-                                  ),
-                                  SizedBox(height: 20),
-                                  _buildWeeklyProgressCard(
-                                    context,
-                                    weeklyTotal,
-                                    cardPadding,
-                                  ),
-                                  // Health Connect Status and Permission Button
-                                  if (!_healthConnectAvailable ||
-                                      _healthConnectStatus.contains('Error') ||
-                                      _healthConnectStatus
-                                          .contains('not granted'))
-                                    _buildHealthConnectStatusCard(
-                                        context, cardPadding),
-                                  SizedBox(
-                                    height:
-                                        MediaQuery.of(context).padding.bottom +
-                                            20,
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+                    );
+                  },
+                ),
         ),
       ),
     );
@@ -472,6 +692,37 @@ class _StepCountPageState extends State<StepCountPage> {
               ),
             ],
           ),
+          // Data source indicator
+          if (_healthConnectAvailable)
+            Container(
+              margin: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Color(0xFF6e9277).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Color(0xFF6e9277).withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.health_and_safety_outlined,
+                    color: Color(0xFF6e9277),
+                    size: 16,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Health Connect',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6e9277),
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(height: _isLandscape(context) ? 16 : 24),
           Stack(
             alignment: Alignment.center,
@@ -539,19 +790,19 @@ class _StepCountPageState extends State<StepCountPage> {
               _buildInfoBox(
                 Icons.timer_outlined,
                 'Time Active',
-                '2h 30m',
+                _calculateTimeActive(steps),
                 context,
               ),
               _buildInfoBox(
                 Icons.local_fire_department_outlined,
                 'Calories',
-                '350',
+                '${_calculateCalories(steps)}',
                 context,
               ),
               _buildInfoBox(
                 Icons.straighten_outlined,
                 'Distance',
-                '5.2 km',
+                _formatDistance(_calculateDistance(steps)),
                 context,
               ),
             ],
@@ -603,6 +854,37 @@ class _StepCountPageState extends State<StepCountPage> {
               ),
             ],
           ),
+          // Data source indicator for weekly
+          if (_healthConnectAvailable)
+            Container(
+              margin: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Color(0xFF6e9277).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Color(0xFF6e9277).withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.health_and_safety_outlined,
+                    color: Color(0xFF6e9277),
+                    size: 16,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Health Connect',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6e9277),
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(height: _isLandscape(context) ? 16 : 24),
           TweenAnimationBuilder<double>(
             tween: Tween<double>(
@@ -744,6 +1026,18 @@ class _StepCountPageState extends State<StepCountPage> {
               fontFamily: 'Poppins',
             ),
           ),
+          if (_healthConnectAvailable && _lastUpdated != null) ...[
+            SizedBox(height: 8),
+            Text(
+              'Last updated: ${_formatLastUpdated(_lastUpdated)}',
+              style: TextStyle(
+                fontSize:
+                    _getFontSize(context, small: 12, medium: 13, large: 14),
+                color: Color(0xFF6e9277),
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ],
           SizedBox(height: _isLandscape(context) ? 16 : 24),
           ElevatedButton(
             onPressed: _requestPermissions,
