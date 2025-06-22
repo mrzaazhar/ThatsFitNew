@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
-import 'package:carousel_slider/carousel_slider.dart';
-import 'package:sensors_plus/sensors_plus.dart';
-import 'dart:math';
-import 'dart:async';
 import 'profile_page.dart';
 import 'main.dart';
 import 'step_count.dart';
@@ -11,7 +7,7 @@ import 'workout.dart';
 import 'widgets/create_workout_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
-import 'services/step_counter_service.dart';
+import 'services/health_connect_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomePage extends StatefulWidget {
@@ -23,7 +19,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0; // Track the selected index
   int _current = 0; // Track current carousel page
   final int dailyGoal = 10000;
-  late StepCounterService _stepService;
+  late HealthConnectService _healthConnectService;
   DateTime? _lastResetDate;
 
   // List of widgets for each tab
@@ -32,9 +28,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _stepService = StepCounterService();
+    _healthConnectService = HealthConnectService();
     _checkAndResetDailySteps().then((_) {
-      _stepService.start();
+      _initHealthConnect();
     });
     _widgetOptions = <Widget>[
       Text('Home Screen'), // Replace with your Home widget
@@ -83,9 +79,23 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  Future<void> _initHealthConnect() async {
+    try {
+      final initialized = await _healthConnectService.initialize();
+      if (initialized) {
+        final available = await _healthConnectService.isAvailable();
+        if (available) {
+          await _healthConnectService.startStepCountMonitoring();
+        }
+      }
+    } catch (e) {
+      print('Error initializing Health Connect: $e');
+    }
+  }
+
   @override
   void dispose() {
-    _stepService.stop();
+    _healthConnectService.dispose();
     super.dispose();
   }
 
@@ -152,12 +162,12 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: _stepService.stepStream(),
+          child: StreamBuilder<int>(
+            stream: _healthConnectService.stepCountStream,
             builder: (context, snapshot) {
               int steps = 0;
-              if (snapshot.hasData && snapshot.data!.data() != null) {
-                steps = snapshot.data!.data()!['dailySteps'] ?? 0;
+              if (snapshot.hasData) {
+                steps = snapshot.data!;
               }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

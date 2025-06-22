@@ -32,7 +32,6 @@ dependencies:
     sdk: flutter
   google_nav_bar: ^5.0.7
   carousel_slider: ^5.0.0
-  sensors_plus: ^4.0.2
   http: ^1.1.0
 
   # The following adds the Cupertino Icons font to your application.
@@ -42,8 +41,7 @@ dependencies:
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.15.5
   permission_handler: ^11.3.0  # For handling permissions
-  pedometer: ^4.0.1
-  
+  health: ^13.1.0
 
 dev_dependencies:
   flutter_test:

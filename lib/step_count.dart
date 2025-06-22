@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sensors_plus/sensors_plus.dart';
-import 'dart:math';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'services/health_connect_service.dart';
 
 class StepCountPage extends StatefulWidget {
   @override
@@ -11,17 +10,19 @@ class StepCountPage extends StatefulWidget {
 }
 
 class _StepCountPageState extends State<StepCountPage> {
-  StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   int _currentSteps = 0;
   int _weeklyTotal = 0;
   final int dailyGoal = 10000;
   final int weeklyGoal = 70000;
-  double _lastMagnitude = 0;
-  double _threshold = 12.0;
-  DateTime? _lastStepTime;
   DateTime? _lastResetDate;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Health Connect integration
+  final HealthConnectService _healthConnectService = HealthConnectService();
+  bool _healthConnectAvailable = false;
+  bool _healthConnectInitialized = false;
+  String _healthConnectStatus = 'Not initialized';
 
   // Add responsive helper methods
   bool _isSmallScreen(BuildContext context) =>
@@ -64,7 +65,155 @@ class _StepCountPageState extends State<StepCountPage> {
   void initState() {
     super.initState();
     _checkAndResetDailySteps().then((_) => _loadInitialSteps());
-    _initAccelerometer();
+    _initHealthConnect();
+  }
+
+  Future<void> _initHealthConnect() async {
+    try {
+      final initialized = await _healthConnectService.initialize();
+      if (initialized) {
+        final available = await _healthConnectService.isAvailable();
+        setState(() {
+          _healthConnectInitialized = true;
+          _healthConnectAvailable = available;
+          _healthConnectStatus = available ? 'Available' : 'Not available';
+        });
+
+        if (available) {
+          // Start Health Connect monitoring automatically
+          await _startHealthConnectMonitoring();
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _healthConnectStatus = 'Error: $e';
+      });
+    }
+  }
+
+  Future<void> _startHealthConnectMonitoring() async {
+    try {
+      final permissionsGranted =
+          await _healthConnectService.requestPermissions();
+      if (permissionsGranted) {
+        await _healthConnectService.startStepCountMonitoring();
+
+        // Get initial step count from Health Connect
+        final steps = await _healthConnectService.getTodayStepCount();
+        setState(() {
+          _currentSteps = steps;
+        });
+
+        // Listen to Health Connect updates
+        _healthConnectService.stepCountStream.listen((steps) {
+          setState(() {
+            _currentSteps = steps;
+          });
+          _updateStepCountInFirestore(steps, _weeklyTotal);
+        });
+      } else {
+        setState(() {
+          _healthConnectStatus = 'Permissions not granted';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Health Connect permissions not granted. Please grant permissions in Health Connect app.')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _healthConnectStatus = 'Error: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error starting Health Connect: $e')),
+      );
+    }
+  }
+
+  Future<void> _requestPermissions() async {
+    try {
+      final permissionsGranted =
+          await _healthConnectService.requestPermissions();
+      if (permissionsGranted) {
+        setState(() {
+          _healthConnectStatus = 'Permissions granted';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Health Connect permissions granted!')),
+        );
+        // Start monitoring after permissions are granted
+        await _startHealthConnectMonitoring();
+      } else {
+        setState(() {
+          _healthConnectStatus = 'Permissions denied';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Health Connect permissions denied. Please grant permissions in Health Connect app.'),
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Open Health Connect',
+              onPressed: () {
+                // This would ideally open Health Connect app
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Please manually open Health Connect app and grant permissions')),
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _healthConnectStatus = 'Error: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error requesting permissions: $e')),
+      );
+    }
+  }
+
+  Future<void> _refreshStepCount() async {
+    if (_healthConnectAvailable) {
+      try {
+        final steps = await _healthConnectService.getTodayStepCount();
+        setState(() {
+          _currentSteps = steps;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Step count refreshed!')),
+        );
+      } catch (e) {
+        String errorMessage = 'Error refreshing step count';
+
+        // Check if it's a permission error
+        if (e.toString().contains('READ_STEPS') ||
+            e.toString().contains('not declared')) {
+          errorMessage =
+              'Health Connect permissions not granted. Please:\n1. Open Health Connect app\n2. Go to Apps and devices\n3. Enable Steps for this app';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            duration: Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Health Connect is not available on this device')),
+      );
+    }
   }
 
   Future<void> _checkAndResetDailySteps() async {
@@ -117,25 +266,6 @@ class _StepCountPageState extends State<StepCountPage> {
     }
   }
 
-  void _initAccelerometer() {
-    _accelerometerSubscription = accelerometerEvents.listen((event) async {
-      double magnitude =
-          sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-      if (magnitude > _threshold && _lastMagnitude <= _threshold) {
-        if (_lastStepTime == null ||
-            DateTime.now().difference(_lastStepTime!).inMilliseconds > 300) {
-          setState(() {
-            _currentSteps++;
-            _weeklyTotal++;
-            _lastStepTime = DateTime.now();
-          });
-          await _updateStepCountInFirestore(_currentSteps, _weeklyTotal);
-        }
-      }
-      _lastMagnitude = magnitude;
-    });
-  }
-
   Future<void> _updateStepCountInFirestore(int steps, int weeklySteps) async {
     final user = _auth.currentUser;
     if (user != null) {
@@ -143,13 +273,14 @@ class _StepCountPageState extends State<StepCountPage> {
         'dailySteps': steps,
         'weeklySteps': weeklySteps,
         'lastUpdated': FieldValue.serverTimestamp(),
+        'stepSource': 'health_connect',
       });
     }
   }
 
   @override
   void dispose() {
-    _accelerometerSubscription?.cancel();
+    _healthConnectService.dispose();
     super.dispose();
   }
 
@@ -222,7 +353,7 @@ class _StepCountPageState extends State<StepCountPage> {
                             color: Colors.white,
                             size: _isLandscape(context) ? 20 : 24,
                           ),
-                          onPressed: _loadInitialSteps,
+                          onPressed: _refreshStepCount,
                         ),
                       ],
                     ),
@@ -273,6 +404,13 @@ class _StepCountPageState extends State<StepCountPage> {
                                     weeklyTotal,
                                     cardPadding,
                                   ),
+                                  // Health Connect Status and Permission Button
+                                  if (!_healthConnectAvailable ||
+                                      _healthConnectStatus.contains('Error') ||
+                                      _healthConnectStatus
+                                          .contains('not granted'))
+                                    _buildHealthConnectStatusCard(
+                                        context, cardPadding),
                                   SizedBox(
                                     height:
                                         MediaQuery.of(context).padding.bottom +
@@ -552,6 +690,81 @@ class _StepCountPageState extends State<StepCountPage> {
               fontWeight: FontWeight.bold,
               color: Colors.white,
               fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthConnectStatusCard(
+      BuildContext context, double cardPadding) {
+    return Container(
+      padding: EdgeInsets.all(cardPadding),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Health Connect Status',
+                style: TextStyle(
+                  fontSize:
+                      _getFontSize(context, small: 18, medium: 20, large: 24),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.all(_isLandscape(context) ? 6 : 8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF6e9277).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.health_and_safety_outlined,
+                  color: Color(0xFF6e9277),
+                  size: _isLandscape(context) ? 20 : 24,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: _isLandscape(context) ? 16 : 24),
+          Text(
+            _healthConnectStatus,
+            style: TextStyle(
+              fontSize: _getFontSize(context, small: 14, medium: 15, large: 16),
+              color: Colors.white.withOpacity(0.7),
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: _isLandscape(context) ? 16 : 24),
+          ElevatedButton(
+            onPressed: _requestPermissions,
+            child: Text(
+              'Request Permissions',
+              style: TextStyle(
+                fontSize:
+                    _getFontSize(context, small: 14, medium: 15, large: 16),
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF6e9277),
+              padding: EdgeInsets.symmetric(
+                horizontal: _isLandscape(context) ? 20 : 24,
+                vertical: _isLandscape(context) ? 12 : 16,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
