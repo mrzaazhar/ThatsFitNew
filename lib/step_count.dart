@@ -127,17 +127,25 @@ class _StepCountPageState extends State<StepCountPage> {
     });
 
     try {
+      print('=== Initializing Step Count App ===');
+
       // Initialize Health Connect first
       await _initHealthConnect();
 
-      // Then load initial data
+      // Then load initial data from Firestore (as fallback)
       await _checkAndResetDailySteps();
       await _loadInitialSteps();
 
       // Calculate weekly total from Health Connect if available
       if (_healthConnectAvailable) {
+        print(
+            'Health Connect available - loading weekly steps from Health Connect');
         await _loadWeeklyStepsFromHealthConnect();
+      } else {
+        print('Health Connect not available - using Firestore data only');
       }
+
+      print('=== App initialization complete ===');
     } catch (e) {
       print('Error initializing app: $e');
     } finally {
@@ -211,6 +219,9 @@ class _StepCountPageState extends State<StepCountPage> {
           _lastUpdated = DateTime.now();
         });
 
+        // Update Firebase with the new step count
+        await _updateStepCountInFirestore(steps, _weeklyTotal);
+
         // Listen to Health Connect updates
         _healthConnectSubscription =
             _healthConnectService.stepCountStream.listen((steps) {
@@ -218,6 +229,7 @@ class _StepCountPageState extends State<StepCountPage> {
             _currentSteps = steps;
             _lastUpdated = DateTime.now();
           });
+          // Update Firebase after UI is updated
           _updateStepCountInFirestore(steps, _weeklyTotal);
         });
 
@@ -242,6 +254,9 @@ class _StepCountPageState extends State<StepCountPage> {
           _lastUpdated = DateTime.now();
         });
 
+        // Update Firebase with the new step count
+        await _updateStepCountInFirestore(steps, _weeklyTotal);
+
         // Listen to Health Connect updates
         _healthConnectSubscription =
             _healthConnectService.stepCountStream.listen((steps) {
@@ -249,6 +264,7 @@ class _StepCountPageState extends State<StepCountPage> {
             _currentSteps = steps;
             _lastUpdated = DateTime.now();
           });
+          // Update Firebase after UI is updated
           _updateStepCountInFirestore(steps, _weeklyTotal);
         });
       } else {
@@ -326,6 +342,32 @@ class _StepCountPageState extends State<StepCountPage> {
     }
   }
 
+  /// Debug method to help troubleshoot Health Connect issues
+  Future<void> _debugHealthConnect() async {
+    try {
+      print('=== Health Connect Debug Info ===');
+
+      final available = await _healthConnectService.isAvailable();
+      print('Health Connect available: $available');
+
+      final hasPerms = await _healthConnectService.hasPermissions();
+      print('Has permissions: $hasPerms');
+
+      if (hasPerms) {
+        try {
+          final steps = await _healthConnectService.getTodayStepCount();
+          print('Today steps: $steps');
+        } catch (e) {
+          print('Error getting steps: $e');
+        }
+      }
+
+      print('=== End Debug Info ===');
+    } catch (e) {
+      print('Debug error: $e');
+    }
+  }
+
   Future<void> _refreshStepCount() async {
     if (_healthConnectAvailable) {
       try {
@@ -333,12 +375,21 @@ class _StepCountPageState extends State<StepCountPage> {
           _isLoading = true;
         });
 
+        print('=== Refreshing Step Count ===');
+        print('Current steps before refresh: $_currentSteps');
+
         final steps = await _healthConnectService.getTodayStepCount();
+        print('Steps from Health Connect: $steps');
+
+        // Update UI immediately
         setState(() {
           _currentSteps = steps;
           _lastUpdated = DateTime.now();
           _isLoading = false;
         });
+
+        // Then update Firebase
+        await _updateStepCountInFirestore(steps, _weeklyTotal);
 
         // Also refresh weekly total
         await _loadWeeklyStepsFromHealthConnect();
@@ -350,6 +401,8 @@ class _StepCountPageState extends State<StepCountPage> {
         setState(() {
           _isLoading = false;
         });
+
+        print('Error refreshing step count: $e');
 
         String errorMessage = 'Error refreshing step count';
 
@@ -385,7 +438,21 @@ class _StepCountPageState extends State<StepCountPage> {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         final data = userDoc.data()!;
-        final lastResetDate = (data['lastResetDate'] as Timestamp?)?.toDate();
+
+        // Handle different types for lastResetDate
+        DateTime? lastResetDate;
+        final lastResetData = data['lastResetDate'];
+        if (lastResetData is Timestamp) {
+          lastResetDate = lastResetData.toDate();
+        } else if (lastResetData is String) {
+          try {
+            lastResetDate = DateTime.parse(lastResetData);
+          } catch (e) {
+            print('Error parsing lastResetDate string: $e');
+            lastResetDate = null;
+          }
+        }
+
         final now = DateTime.now();
 
         if (lastResetDate == null ||
@@ -420,10 +487,25 @@ class _StepCountPageState extends State<StepCountPage> {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         final data = userDoc.data()!;
+
+        // Handle different types for lastResetDate
+        DateTime? lastResetDate;
+        final lastResetData = data['lastResetDate'];
+        if (lastResetData is Timestamp) {
+          lastResetDate = lastResetData.toDate();
+        } else if (lastResetData is String) {
+          try {
+            lastResetDate = DateTime.parse(lastResetData);
+          } catch (e) {
+            print('Error parsing lastResetDate string: $e');
+            lastResetDate = null;
+          }
+        }
+
         setState(() {
           _currentSteps = data['dailySteps'] ?? 0;
           _weeklyTotal = data['weeklySteps'] ?? 0;
-          _lastResetDate = (data['lastResetDate'] as Timestamp?)?.toDate();
+          _lastResetDate = lastResetDate;
         });
       }
     }
@@ -438,32 +520,6 @@ class _StepCountPageState extends State<StepCountPage> {
         'lastUpdated': FieldValue.serverTimestamp(),
         'stepSource': 'health_connect',
       });
-    }
-  }
-
-  /// Debug method to help troubleshoot Health Connect issues
-  Future<void> _debugHealthConnect() async {
-    try {
-      print('=== Health Connect Debug Info ===');
-
-      final available = await _healthConnectService.isAvailable();
-      print('Health Connect available: $available');
-
-      final hasPerms = await _healthConnectService.hasPermissions();
-      print('Has permissions: $hasPerms');
-
-      if (hasPerms) {
-        try {
-          final steps = await _healthConnectService.getTodayStepCount();
-          print('Today steps: $steps');
-        } catch (e) {
-          print('Error getting steps: $e');
-        }
-      }
-
-      print('=== End Debug Info ===');
-    } catch (e) {
-      print('Debug error: $e');
     }
   }
 
@@ -532,6 +588,16 @@ class _StepCountPageState extends State<StepCountPage> {
                       weeklyTotal =
                           snapshot.data!.data()!['weeklySteps'] ?? weeklyTotal;
                     }
+                    // If Health Connect is available, only use Firestore for weekly total if not already loaded
+                    else if (_healthConnectAvailable &&
+                        snapshot.hasData &&
+                        snapshot.data!.data() != null) {
+                      // Only update weekly total from Firestore if we haven't loaded it from Health Connect yet
+                      if (_weeklyTotal == 0) {
+                        weeklyTotal = snapshot.data!.data()!['weeklySteps'] ??
+                            weeklyTotal;
+                      }
+                    }
 
                     return Column(
                       children: [
@@ -563,6 +629,14 @@ class _StepCountPageState extends State<StepCountPage> {
                                 ),
                               ),
                               Spacer(),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.bug_report_rounded,
+                                  color: Colors.white,
+                                  size: _isLandscape(context) ? 20 : 24,
+                                ),
+                                onPressed: _debugHealthConnect,
+                              ),
                               IconButton(
                                 icon: Icon(
                                   Icons.refresh_rounded,

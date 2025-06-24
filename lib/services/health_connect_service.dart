@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class HealthConnectService {
   static const String _tag = 'HealthConnectService';
@@ -15,6 +16,9 @@ class HealthConnectService {
 
   // Firestore instance
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Firebase Auth instance
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Initialize Health Connect
   Future<bool> initialize() async {
@@ -100,13 +104,22 @@ class HealthConnectService {
     try {
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay =
+          DateTime(now.year, now.month, now.day, 23, 59, 59); // Use end of day
+
+      print('$_tag: Current time: ${now.toIso8601String()}');
+      print('$_tag: Start of day: ${startOfDay.toIso8601String()}');
+      print('$_tag: End time: ${endOfDay.toIso8601String()}');
 
       // Get total steps for today
-      final steps = await _health.getTotalStepsInInterval(startOfDay, now);
+      final steps = await _health.getTotalStepsInInterval(startOfDay, endOfDay);
 
       final stepCount = steps ?? 0;
 
-      await _updateStepCountInFirestore(stepCount);
+      print('$_tag: Raw steps from health plugin: $steps');
+      print('$_tag: Final step count: $stepCount');
+
+      // Emit the new step count to update UI immediately
       _stepCountController.add(stepCount);
       print('$_tag: Retrieved $stepCount steps for today');
       return stepCount;
@@ -246,21 +259,54 @@ class HealthConnectService {
   /// Update step count in Firestore
   Future<void> _updateStepCountInFirestore(int stepCount) async {
     try {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'dailySteps': stepCount,
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'stepSource': 'health_connect',
+        });
 
-      await _firestore
-          .collection('step_counts')
-          .doc(today.toIso8601String())
-          .set({
-        'stepCount': stepCount,
-        'date': today.toIso8601String(),
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      print('$_tag: Updated step count in Firestore: $stepCount');
+        print('$_tag: Updated user document with $stepCount steps');
+      }
     } catch (e) {
-      print('$_tag: Error updating step count in Firestore: $e');
+      print('$_tag: Error updating Firestore: $e');
+    }
+  }
+
+  /// Debug method to test different step count retrieval methods
+  Future<void> debugStepCount() async {
+    try {
+      print('=== Debug Step Count ===');
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = now;
+
+      print(
+          'Time range: ${startOfDay.toIso8601String()} to ${endOfDay.toIso8601String()}');
+
+      // Try different methods
+      final method1 =
+          await _health.getTotalStepsInInterval(startOfDay, endOfDay);
+      print('Method 1 (getTotalStepsInInterval): $method1');
+
+      // Try with a broader range
+      final yesterday = startOfDay.subtract(Duration(days: 1));
+      final method2 =
+          await _health.getTotalStepsInInterval(yesterday, endOfDay);
+      print('Method 2 (including yesterday): $method2');
+
+      // Try with just today's range
+      final todayEnd =
+          startOfDay.add(Duration(days: 1)).subtract(Duration(milliseconds: 1));
+      final method3 =
+          await _health.getTotalStepsInInterval(startOfDay, todayEnd);
+      print('Method 3 (full day): $method3');
+
+      print('=== End Debug ===');
+    } catch (e) {
+      print('Debug error: $e');
     }
   }
 
