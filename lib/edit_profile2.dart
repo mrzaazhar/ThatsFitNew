@@ -31,17 +31,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final doc = await FirebaseFirestore.instance
+        // Get the profile document from the profile subcollection
+        final profileSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
+            .collection('profile')
+            .limit(1)
             .get();
 
-        if (doc.exists) {
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileData = profileSnapshot.docs[0].data();
           setState(() {
-            _ageController.text = doc.data()?['age']?.toString() ?? '';
-            _weightController.text = doc.data()?['weight']?.toString() ?? '';
-            _selectedGender = doc.data()?['gender'] ?? 'Male';
-            _selectedExperience = doc.data()?['experience'] ?? 'Beginner';
+            _ageController.text = profileData['age']?.toString() ?? '';
+            _weightController.text = profileData['weight']?.toString() ?? '';
+            _selectedGender = profileData['gender'] ?? 'Male';
+            _selectedExperience = profileData['experience'] ?? 'Beginner';
           });
         }
       }
@@ -97,16 +101,37 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance
+        // Get the profile document from the profile subcollection
+        final profileSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
-          'age': age,
-          'weight': weight,
-          'gender': _selectedGender,
-          'experience': _selectedExperience,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+            .collection('profile')
+            .limit(1)
+            .get();
+
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileDoc = profileSnapshot.docs[0];
+          await profileDoc.reference.update({
+            'age': age,
+            'weight': weight,
+            'gender': _selectedGender,
+            'experience': _selectedExperience,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // If no profile exists, create one
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('profile')
+              .add({
+            'age': age,
+            'weight': weight,
+            'gender': _selectedGender,
+            'experience': _selectedExperience,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile updated successfully!')),

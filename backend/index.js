@@ -32,17 +32,47 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// Helper function to get user profile data
+async function getUserProfileData(userId) {
+  try {
+    // First, get the profile document from the profile subcollection
+    const profileSnapshot = await db.collection('users').doc(userId).collection('profile').limit(1).get();
+    
+    if (profileSnapshot.empty) {
+      throw new Error('User profile not found');
+    }
+    
+    // Get the first (and should be only) profile document
+    const profileDoc = profileSnapshot.docs[0];
+    return {
+      profileId: profileDoc.id,
+      ...profileDoc.data()
+    };
+  } catch (error) {
+    console.error('Error getting user profile data:', error);
+    throw error;
+  }
+}
+
 // Get all users
 app.get('/api/users', async (req, res) => {
   try {
     const snapshot = await db.collection('users').get();
     const users = [];
-    snapshot.forEach(doc => {
-      users.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    
+    for (const userDoc of snapshot.docs) {
+      try {
+        const profileData = await getUserProfileData(userDoc.id);
+        users.push({
+          id: userDoc.id,
+          ...profileData
+        });
+      } catch (error) {
+        console.error(`Error getting profile for user ${userDoc.id}:`, error);
+        // Continue with other users even if one fails
+      }
+    }
+    
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -53,16 +83,14 @@ app.get('/api/users', async (req, res) => {
 app.get('/api/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const profileData = await getUserProfileData(userId);
+    
     res.json({
-      id: userDoc.id,
-      ...userDoc.data()
+      id: userId,
+      ...profileData
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(404).json({ error: 'User not found' });
   }
 });
 
@@ -70,15 +98,24 @@ app.get('/api/users/:userId', async (req, res) => {
 app.post('/api/users', async (req, res) => {
   try {
     const userData = req.body;
-    const docRef = await db.collection('users').add({
+    const { userId } = userData;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // Create a profile document in the profile subcollection
+    const profileRef = await db.collection('users').doc(userId).collection('profile').add({
       ...userData,
       dailySteps: 0,
       weeklySteps: 0,
       lastResetDate: new Date().toISOString().split('T')[0],
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
+    
     res.status(201).json({
-      id: docRef.id,
+      id: userId,
+      profileId: profileRef.id,
       message: 'User created successfully'
     });
   } catch (error) {
@@ -92,30 +129,25 @@ app.put('/api/users/:userId/steps', async (req, res) => {
     const { userId } = req.params;
     const { steps } = req.body;
     
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
+    const profileData = await getUserProfileData(userId);
+    const profileRef = db.collection('users').doc(userId).collection('profile').doc(profileData.profileId);
     
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const userData = userDoc.data();
     const currentDate = new Date().toISOString().split('T')[0];
     
     // Only update step counts, no workout creation
-    if (userData.lastResetDate !== currentDate) {
-      await userRef.update({
+    if (profileData.lastResetDate !== currentDate) {
+      await profileRef.update({
         dailySteps: steps,
-        weeklySteps: (userData.weeklySteps || 0) + steps,
+        weeklySteps: (profileData.weeklySteps || 0) + steps,
         lastResetDate: currentDate,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } else {
       // Calculate the step difference for weekly total
-      const stepDifference = steps - (userData.dailySteps || 0);
-      await userRef.update({
+      const stepDifference = steps - (profileData.dailySteps || 0);
+      await profileRef.update({
         dailySteps: steps,
-        weeklySteps: (userData.weeklySteps || 0) + stepDifference,
+        weeklySteps: (profileData.weeklySteps || 0) + stepDifference,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
@@ -124,7 +156,7 @@ app.put('/api/users/:userId/steps', async (req, res) => {
     res.json({ 
       message: 'Step count updated successfully',
       dailySteps: steps,
-      weeklySteps: userData.weeklySteps + (userData.lastResetDate !== currentDate ? steps : stepDifference)
+      weeklySteps: profileData.weeklySteps + (profileData.lastResetDate !== currentDate ? steps : stepDifference)
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -142,6 +174,19 @@ app.post('/api/users/:userId/create-workout', async (req, res) => {
 
     if (!userId) {
       throw new Error('User ID is required');
+    }
+
+    // First, verify that the user profile exists
+    try {
+      const profileData = await getUserProfileData(userId);
+      console.log('User profile found:', profileData);
+    } catch (profileError) {
+      console.error('Error getting user profile:', profileError);
+      return res.status(404).json({ 
+        error: 'User profile not found',
+        details: 'Please ensure the user has completed profile setup',
+        userId: userId
+      });
     }
 
     // Get workout recommendation using the flowise functions

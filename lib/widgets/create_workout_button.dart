@@ -40,14 +40,35 @@ class CreateWorkoutButton extends StatelessWidget {
       final currentDay = _getCurrentDay();
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance
+        // Get the profile document first
+        final profileSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
-          'currentDay': currentDay,
-          'lastWorkoutDay': FieldValue.serverTimestamp(),
-        });
-        print('Updated current day in Firebase: $currentDay');
+            .collection('profile')
+            .limit(1)
+            .get();
+
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileDoc = profileSnapshot.docs[0];
+          await profileDoc.reference.update({
+            'currentDay': currentDay,
+            'lastWorkoutDay': FieldValue.serverTimestamp(),
+          });
+          print('Updated current day in Firebase: $currentDay');
+        } else {
+          print('No profile document found for user');
+          // Show a more helpful error message
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Please complete your profile setup first'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
       }
 
       final workoutService = WorkoutService();
@@ -72,10 +93,20 @@ class CreateWorkoutButton extends StatelessWidget {
       print('Stack trace: $stackTrace');
 
       if (context.mounted) {
+        String errorMessage = 'Error creating workout: $e';
+        
+        // Provide more helpful error messages
+        if (e.toString().contains('User profile not found')) {
+          errorMessage = 'Please complete your profile setup first. Go to Profile > Edit Profile to set up your fitness information.';
+        } else if (e.toString().contains('Cannot connect to server')) {
+          errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error creating workout: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
           ),
         );
       }

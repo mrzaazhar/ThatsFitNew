@@ -4,6 +4,7 @@ import 'profile_page.dart';
 import 'main.dart';
 import 'step_count.dart';
 import 'workout.dart';
+import 'saved_workout.dart';
 import 'widgets/create_workout_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
@@ -409,6 +410,82 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   SizedBox(height: 18),
+                  // Saved Workouts Card
+                  Card(
+                    color: Color(0xFF6e9277),
+                    elevation: 7,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SavedWorkoutPage(),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          maxWidth: 500,
+                          minHeight: 120,
+                        ),
+                        padding: EdgeInsets.all(24),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(
+                                Icons.favorite,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                            ),
+                            SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Saved Workouts',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'View your favorite exercises',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 18),
                 ],
               );
             },
@@ -446,12 +523,17 @@ class _HomePageState extends State<HomePage> {
   Future<void> _checkAndResetDailySteps() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final userDoc = await FirebaseFirestore.instance
+      // Get the profile document from the profile subcollection
+      final profileSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
+          .collection('profile')
+          .limit(1)
           .get();
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
+
+      if (profileSnapshot.docs.isNotEmpty) {
+        final profileDoc = profileSnapshot.docs[0];
+        final data = profileDoc.data();
         final lastResetDate = (data['lastResetDate'] as Timestamp?)?.toDate();
         final now = DateTime.now();
 
@@ -461,10 +543,7 @@ class _HomePageState extends State<HomePage> {
             lastResetDate.day != now.day) {
           final currentWeeklyTotal = data['weeklySteps'] ?? 0;
 
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .update({
+          await profileDoc.reference.update({
             'dailySteps': 0,
             'lastResetDate': FieldValue.serverTimestamp(),
             'weeklySteps': currentWeeklyTotal,

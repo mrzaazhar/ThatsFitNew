@@ -435,9 +435,17 @@ class _StepCountPageState extends State<StepCountPage> {
   Future<void> _checkAndResetDailySteps() async {
     final user = _auth.currentUser;
     if (user != null) {
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
+      // Get the profile document from the profile subcollection
+      final profileSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('profile')
+          .limit(1)
+          .get();
+
+      if (profileSnapshot.docs.isNotEmpty) {
+        final profileDoc = profileSnapshot.docs[0];
+        final data = profileDoc.data();
 
         // Handle different types for lastResetDate
         DateTime? lastResetDate;
@@ -461,7 +469,7 @@ class _StepCountPageState extends State<StepCountPage> {
             lastResetDate.day != now.day) {
           final currentWeeklyTotal = data['weeklySteps'] ?? 0;
 
-          await _firestore.collection('users').doc(user.uid).update({
+          await profileDoc.reference.update({
             'dailySteps': 0,
             'lastResetDate': FieldValue.serverTimestamp(),
             'weeklySteps': currentWeeklyTotal,
@@ -484,9 +492,17 @@ class _StepCountPageState extends State<StepCountPage> {
   Future<void> _loadInitialSteps() async {
     final user = _auth.currentUser;
     if (user != null) {
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        final data = userDoc.data()!;
+      // Get the profile document from the profile subcollection
+      final profileSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('profile')
+          .limit(1)
+          .get();
+
+      if (profileSnapshot.docs.isNotEmpty) {
+        final profileDoc = profileSnapshot.docs[0];
+        final data = profileDoc.data();
 
         // Handle different types for lastResetDate
         DateTime? lastResetDate;
@@ -514,12 +530,23 @@ class _StepCountPageState extends State<StepCountPage> {
   Future<void> _updateStepCountInFirestore(int steps, int weeklySteps) async {
     final user = _auth.currentUser;
     if (user != null) {
-      await _firestore.collection('users').doc(user.uid).update({
-        'dailySteps': steps,
-        'weeklySteps': weeklySteps,
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'stepSource': 'health_connect',
-      });
+      // Get the profile document from the profile subcollection
+      final profileSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('profile')
+          .limit(1)
+          .get();
+
+      if (profileSnapshot.docs.isNotEmpty) {
+        final profileDoc = profileSnapshot.docs[0];
+        await profileDoc.reference.update({
+          'dailySteps': steps,
+          'weeklySteps': weeklySteps,
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'stepSource': 'health_connect',
+        });
+      }
     }
   }
 
@@ -572,9 +599,14 @@ class _StepCountPageState extends State<StepCountPage> {
                     ],
                   ),
                 )
-              : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: user != null
-                      ? _firestore.collection('users').doc(user.uid).snapshots()
+                      ? _firestore
+                          .collection('users')
+                          .doc(user.uid)
+                          .collection('profile')
+                          .limit(1)
+                          .snapshots()
                       : const Stream.empty(),
                   builder: (context, snapshot) {
                     int steps = _currentSteps;
@@ -583,19 +615,19 @@ class _StepCountPageState extends State<StepCountPage> {
                     // Only update from Firestore if Health Connect is not available
                     if (!_healthConnectAvailable &&
                         snapshot.hasData &&
-                        snapshot.data!.data() != null) {
-                      steps = snapshot.data!.data()!['dailySteps'] ?? steps;
-                      weeklyTotal =
-                          snapshot.data!.data()!['weeklySteps'] ?? weeklyTotal;
+                        snapshot.data!.docs.isNotEmpty) {
+                      final profileData = snapshot.data!.docs[0].data();
+                      steps = profileData['dailySteps'] ?? steps;
+                      weeklyTotal = profileData['weeklySteps'] ?? weeklyTotal;
                     }
                     // If Health Connect is available, only use Firestore for weekly total if not already loaded
                     else if (_healthConnectAvailable &&
                         snapshot.hasData &&
-                        snapshot.data!.data() != null) {
+                        snapshot.data!.docs.isNotEmpty) {
                       // Only update weekly total from Firestore if we haven't loaded it from Health Connect yet
                       if (_weeklyTotal == 0) {
-                        weeklyTotal = snapshot.data!.data()!['weeklySteps'] ??
-                            weeklyTotal;
+                        final profileData = snapshot.data!.docs[0].data();
+                        weeklyTotal = profileData['weeklySteps'] ?? weeklyTotal;
                       }
                     }
 

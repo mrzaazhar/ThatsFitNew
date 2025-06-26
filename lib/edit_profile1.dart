@@ -27,15 +27,19 @@ class _EditProfile1State extends State<EditProfile1> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final doc = await FirebaseFirestore.instance
+        // Get the profile document from the profile subcollection
+        final profileSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
+            .collection('profile')
+            .limit(1)
             .get();
 
-        if (doc.exists) {
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileData = profileSnapshot.docs[0].data();
           setState(() {
-            _nameController.text = doc.data()?['name'] ?? '';
-            _usernameController.text = doc.data()?['username'] ?? '';
+            _nameController.text = profileData['name'] ?? '';
+            _usernameController.text = profileData['username'] ?? '';
             _emailController.text = user.email ?? '';
           });
         }
@@ -163,14 +167,33 @@ class _EditProfile1State extends State<EditProfile1> {
         }
 
         // Update Firestore document
-        await FirebaseFirestore.instance
+        // Get the profile document from the profile subcollection
+        final profileSnapshot = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .update({
-          'name': _nameController.text.trim(),
-          'username': _usernameController.text.trim(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+            .collection('profile')
+            .limit(1)
+            .get();
+
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileDoc = profileSnapshot.docs[0];
+          await profileDoc.reference.update({
+            'name': _nameController.text.trim(),
+            'username': _usernameController.text.trim(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // If no profile exists, create one
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('profile')
+              .add({
+            'name': _nameController.text.trim(),
+            'username': _usernameController.text.trim(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile updated successfully!')),

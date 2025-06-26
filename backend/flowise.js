@@ -7,17 +7,24 @@ async function fetchLatestUserData(userId) {
         console.log('\n=== Fetching User Data for Workout Creation ===');
         console.log('User ID:', userId);
 
-        // Get user document
-        const userDoc = await admin.firestore()
+        // Get profile document from the profile subcollection
+        const profileSnapshot = await admin.firestore()
             .collection('users')
             .doc(userId)
+            .collection('profile')
+            .limit(1)
             .get();
 
-        if (!userDoc.exists) {
-            throw new Error('User not found');
+        console.log('Profile snapshot size:', profileSnapshot.size);
+        console.log('Profile snapshot empty:', profileSnapshot.empty);
+
+        if (profileSnapshot.empty) {
+            throw new Error(`User profile not found for userId: ${userId}`);
         }
 
-        const userData = userDoc.data();
+        // Get the first (and should be only) profile document
+        const profileDoc = profileSnapshot.docs[0];
+        const userData = profileDoc.data();
         console.log('User Profile Data:', userData);
         
         // Only use dailySteps from user profile, don't check activity collection
@@ -27,7 +34,7 @@ async function fetchLatestUserData(userId) {
         // Return all data in a single data object
         const flowiseData = {
             stepCount: latestStepCount,
-            trainingExperience: userData.experience,
+            trainingExperience: userData.experience || 'Beginner',
             currentDay: userData.currentDay || 'Monday'
         };
 
