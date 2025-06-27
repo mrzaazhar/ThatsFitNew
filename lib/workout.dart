@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'widgets/workout_video_player.dart';
+import 'services/youtube_service.dart';
 
 class WorkoutPage extends StatefulWidget {
   final Map<String, dynamic>? suggestedWorkout;
@@ -353,6 +355,11 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Widget _buildExerciseCard(
       Map<String, dynamic> exercise, BuildContext context) {
+    // Get video ID from exercise data or fallback to YouTube service
+    final videoId = exercise['videoId'] ??
+        exercise['details']?['videoId'] ??
+        YouTubeService.getVideoId(exercise['name'] ?? 'Exercise');
+
     return GestureDetector(
       onPanEnd: (details) {
         // Check if the swipe was significant enough (right to left)
@@ -406,6 +413,26 @@ class _WorkoutPageState extends State<WorkoutPage> {
                       ),
                     ),
                   ),
+                  // Video button with enhanced styling
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Color(0xFF6e9277).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      onPressed: () => _openVideoPlayer(
+                        exercise['name'] ?? 'Exercise',
+                        videoId: videoId,
+                      ),
+                      icon: Icon(
+                        Icons.play_circle_outline,
+                        color: Color(0xFF6e9277),
+                        size: 24,
+                      ),
+                      tooltip: 'Watch Tutorial Video',
+                    ),
+                  ),
+                  SizedBox(width: 8),
                   // Add a hint icon
                   Icon(
                     Icons.swipe_left,
@@ -415,6 +442,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 ],
               ),
               SizedBox(height: 16),
+
+              // Video Thumbnail Section (if video ID is available)
+              if (videoId != null &&
+                  videoId != 'dQw4w9WgXcQ') // Don't show for default video
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  child: _buildVideoThumbnail(
+                      videoId, exercise['name'] ?? 'Exercise', context),
+                ),
+
               _buildExerciseDetail(
                 Icons.repeat,
                 'Sets & Reps',
@@ -434,6 +471,73 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 'Form Tips',
                 exercise['details']?['formTips'] ?? 'N/A',
                 context,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoThumbnail(
+      String videoId, String exerciseName, BuildContext context) {
+    return GestureDetector(
+      onTap: () => _openVideoPlayer(exerciseName, videoId: videoId),
+      child: Container(
+        height: _isSmallScreen(context) ? 120 : 140,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.grey[200],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              // Video thumbnail
+              Image.network(
+                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.network(
+                    'https://img.youtube.com/vi/$videoId/hqdefault.jpg',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[300],
+                        child: Icon(
+                          Icons.video_library,
+                          size: 48,
+                          color: Colors.grey[500],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              // Play button overlay
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                ),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF6e9277).withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Icon(
+                      Icons.play_arrow,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -630,5 +734,66 @@ class _WorkoutPageState extends State<WorkoutPage> {
         ),
       ),
     );
+  }
+
+  void _openVideoPlayer(String exerciseName, {String? videoId}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutVideoPlayer(
+          exerciseName: exerciseName,
+          videoId: videoId,
+        ),
+      ),
+    );
+  }
+
+  // Helper method to demonstrate how to structure exercise data with video IDs
+  Map<String, dynamic> _createExerciseWithVideo({
+    required String name,
+    required String setsAndReps,
+    required String restPeriod,
+    required String formTips,
+    String? videoId,
+  }) {
+    return {
+      'name': name,
+      'details': {
+        'setsAndReps': setsAndReps,
+        'restPeriod': restPeriod,
+        'formTips': formTips,
+        'videoId': videoId, // Optional: specific video ID for this exercise
+      },
+      'videoId': videoId, // Alternative: video ID at root level
+    };
+  }
+
+  // Example of how to use the video system
+  List<Map<String, dynamic>> _getExampleExercises() {
+    return [
+      _createExerciseWithVideo(
+        name: 'Barbell Squats',
+        setsAndReps: '3 sets x 8-12 reps',
+        restPeriod: '2-3 minutes',
+        formTips:
+            'Keep chest up, knees in line with toes, go parallel or below',
+        videoId: 'aclHkVaku9U', // Specific video ID for Barbell Squats
+      ),
+      _createExerciseWithVideo(
+        name: 'Push-ups',
+        setsAndReps: '3 sets x 10-15 reps',
+        restPeriod: '1-2 minutes',
+        formTips: 'Maintain straight body line, lower chest to ground',
+        // Will use default video ID from YouTubeService
+      ),
+      _createExerciseWithVideo(
+        name: 'Deadlift',
+        setsAndReps: '3 sets x 5-8 reps',
+        restPeriod: '3-4 minutes',
+        formTips:
+            'Keep bar close to body, hinge at hips, maintain neutral spine',
+        videoId: '1XEDaV7ZZqs', // Specific video ID for Deadlift
+      ),
+    ];
   }
 }

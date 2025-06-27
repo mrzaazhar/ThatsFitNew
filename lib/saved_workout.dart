@@ -369,6 +369,16 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                   ),
                   tooltip: 'Remove from favorites',
                 ),
+                IconButton(
+                  onPressed: () =>
+                      _openVideoPlayer(workout['exerciseName'] ?? 'Exercise'),
+                  icon: Icon(
+                    Icons.play_circle_outline,
+                    color: Color(0xFF6e9277),
+                    size: 24,
+                  ),
+                  tooltip: 'Watch Video',
+                ),
               ],
             ),
           ),
@@ -512,5 +522,9 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
     if (shouldDelete == true) {
       _deleteWorkout(workoutId);
     }
+  }
+
+  Future<void> _openVideoPlayer(String exerciseName) async {
+    // Implementation of _openVideoPlayer method
   }
 }

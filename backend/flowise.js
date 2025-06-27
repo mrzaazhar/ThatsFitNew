@@ -65,13 +65,70 @@ Workout Schedule Based On Current Day:
 - Saturday: Legs
 - Sunday: Shoulders
 
+List Of Exercises Names Based On Body Part:
+1. Chest:
+    - Bench Press
+    - Dumbell bench press
+    - Incline bench press
+    - Incline dumbell press
+    - Pec Fly
+    - Dumbell Fly
+    - Cable Fly
+    - Dips
+
+2. Back:
+    - Lat Pull Downs
+    - Cable Rows
+    - Barbell Rows
+    - Dumbell Rows
+    - Rope Pull Downs
+    - Pull Ups
+    - Deadlifts
+
+3. Biceps:
+    - Barbell Curls
+    - Dumbell Curls
+    - Wide Grip Curls 
+    - Hammer Curls
+    - Preacher Curls
+    - Concentration Curls
+    - Rope Hammer Curls
+
+4. Triceps:
+    - Tricep Rope Extensions
+    - Tricep Cable Push Downs
+    - Tricep Close Grip Cable Push Downs
+    - Dumbell Tricep Extensions
+    - Barbell Skull Crushers
+
+5. Shoulders:
+    - Barbell Shoulder Press
+    - Dumbell Shoulder Press
+    - Barbell Lateral Raises
+    - Dumbell Lateral Raises
+    - Barbell Front Raises
+    - Dumbell Front Raises
+    - Dumbell Reverse Flys
+    - Machine Reverse Flys
+
+6. Legs:
+    - Barbell Squats
+    - Hack Squats
+    - Leg Press (Machine)
+    - Leg Extensions (Machine)
+    - Leg Hamstring Curls (Machine)
+    - Leg Calf Raises (Machine)
+     
 Please provide a detailed workout plan that includes:
-1. Exercise name
+1. Exercise name (adjusted based on the list of exercises names)
 2. Sets and reps (adjusted based on step count)
 3. Rest periods (adjusted based on experience level)
 4. Brief form tips
 
-Format the response in a clear, structured way that's easy to read.
+Format the response in a clear, structured way that's easy to read. 
+Please ensure that the exercise name is in the list of exercises names.
+For each body part's exercise, please provide 3-4 exercises.
+Please randomize the exercises for each body part when a new workout is created.
 Please format the response as:
 
 Workout Plan:
