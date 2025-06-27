@@ -568,16 +568,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
         return;
       }
 
+      print('=== Saving Exercise to Favorites ===');
+      print('User ID: ${user.uid}');
+      print('Exercise data: $exercise');
+
       // Create a unique workout ID
       final workoutId = DateTime.now().millisecondsSinceEpoch.toString();
+      print('Generated workout ID: $workoutId');
 
-      // Save exercise to Firebase
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('workouts')
-          .doc(workoutId)
-          .set({
+      // Prepare data to save
+      final workoutData = {
         'exerciseName': exercise['name'] ?? 'Unknown Exercise',
         'setsAndReps': exercise['details']?['setsAndReps'] ?? 'N/A',
         'restPeriod': exercise['details']?['restPeriod'] ?? 'N/A',
@@ -585,7 +585,20 @@ class _WorkoutPageState extends State<WorkoutPage> {
         'savedAt': FieldValue.serverTimestamp(),
         'workoutType': 'favorite_exercise',
         'source': 'workout_plan'
-      });
+      };
+
+      print('Data to save: $workoutData');
+      print('Collection path: users/${user.uid}/workouts/$workoutId');
+
+      // Save exercise to Firebase
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('workouts')
+          .doc(workoutId)
+          .set(workoutData);
+
+      print('Exercise saved successfully to Firebase!');
 
       _showSnackBar('Exercise saved to favorites! 💪', Colors.green);
 
@@ -593,6 +606,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       HapticFeedback.lightImpact();
     } catch (e) {
       print('Error saving exercise: $e');
+      print('Error details: ${e.toString()}');
       _showSnackBar('Failed to save exercise. Please try again.', Colors.red);
     }
   }

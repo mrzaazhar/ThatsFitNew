@@ -13,28 +13,6 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _savedWorkouts = [];
 
-  // Responsive helper methods
-  bool _isSmallScreen(BuildContext context) =>
-      MediaQuery.of(context).size.width < 600;
-  bool _isMediumScreen(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 600 &&
-      MediaQuery.of(context).size.width < 900;
-  bool _isLargeScreen(BuildContext context) =>
-      MediaQuery.of(context).size.width >= 900;
-
-  double _getCardPadding(BuildContext context) {
-    if (_isSmallScreen(context)) return 16.0;
-    if (_isMediumScreen(context)) return 24.0;
-    return 32.0;
-  }
-
-  double _getFontSize(BuildContext context,
-      {required double small, required double medium, required double large}) {
-    if (_isSmallScreen(context)) return small;
-    if (_isMediumScreen(context)) return medium;
-    return large;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -48,32 +26,83 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
       });
 
       final user = _auth.currentUser;
+      print('=== Loading Saved Workouts ===');
+      print('Current user: ${user?.uid}');
+
       if (user != null) {
-        final snapshot = await _firestore
+        print('Querying Firebase for saved workouts...');
+
+        // First, let's check if any workouts exist at all
+        final allWorkoutsSnapshot = await _firestore
             .collection('users')
             .doc(user.uid)
             .collection('workouts')
-            .where('workoutType', isEqualTo: 'favorite_exercise')
-            .orderBy('savedAt', descending: true)
             .get();
 
-        setState(() {
-          _savedWorkouts = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
+        print(
+            'Total workouts in collection: ${allWorkoutsSnapshot.docs.length}');
+        if (allWorkoutsSnapshot.docs.isNotEmpty) {
+          print('All workouts data:');
+          for (var doc in allWorkoutsSnapshot.docs) {
+            print('  Document ${doc.id}: ${doc.data()}');
+          }
+        }
+
+        // Now try to get favorite exercises
+        QuerySnapshot snapshot;
+        try {
+          snapshot = await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('workouts')
+              .where('workoutType', isEqualTo: 'favorite_exercise')
+              .get();
+        } catch (e) {
+          print('Filtered query failed, getting all workouts: $e');
+          // If the filtered query fails, get all workouts and filter manually
+          snapshot = allWorkoutsSnapshot;
+        }
+
+        print('Firebase query completed');
+        print('Number of documents found: ${snapshot.docs.length}');
+
+        List<Map<String, dynamic>> workouts = [];
+
+        for (var doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          print('Processing document ${doc.id}: $data');
+
+          // If we got all workouts, filter for favorite_exercise manually
+          if (snapshot == allWorkoutsSnapshot) {
+            if (data['workoutType'] == 'favorite_exercise') {
+              workouts.add({
+                'id': doc.id,
+                ...data,
+              });
+            }
+          } else {
+            workouts.add({
               'id': doc.id,
               ...data,
-            };
-          }).toList();
+            });
+          }
+        }
+
+        setState(() {
+          _savedWorkouts = workouts;
           _isLoading = false;
         });
+
+        print('Final saved workouts list length: ${_savedWorkouts.length}');
       } else {
+        print('No user logged in');
         setState(() {
           _isLoading = false;
         });
       }
     } catch (e) {
       print('Error loading saved workouts: $e');
+      print('Error details: ${e.toString()}');
       setState(() {
         _isLoading = false;
       });
@@ -91,16 +120,15 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
             .doc(workoutId)
             .delete();
 
-        // Remove from local list
         setState(() {
           _savedWorkouts.removeWhere((workout) => workout['id'] == workoutId);
         });
 
-        _showSnackBar('Workout removed from favorites', Colors.green);
+        _showSnackBar('Exercise removed from favorites', Colors.green);
       }
     } catch (e) {
       print('Error deleting workout: $e');
-      _showSnackBar('Failed to remove workout', Colors.red);
+      _showSnackBar('Failed to remove exercise', Colors.red);
     }
   }
 
@@ -133,13 +161,14 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Color(0xFFf8f9fa),
       appBar: AppBar(
         title: Text(
-          'Saved Workouts',
+          'My Favorite Exercises',
           style: TextStyle(
             fontFamily: 'Poppins',
             fontWeight: FontWeight.w600,
+            fontSize: 20,
           ),
         ),
         backgroundColor: Color(0xFF6e9277),
@@ -149,6 +178,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: _loadSavedWorkouts,
+            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -168,9 +198,9 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
           ),
-          SizedBox(height: 16),
+          SizedBox(height: 20),
           Text(
-            'Loading your saved workouts...',
+            'Loading your favorite exercises...',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -185,12 +215,12 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(_getCardPadding(context)),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(32),
               decoration: BoxDecoration(
                 color: Color(0xFF6e9277).withOpacity(0.1),
                 shape: BoxShape.circle,
@@ -201,24 +231,22 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                 color: Color(0xFF6e9277),
               ),
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 32),
             Text(
-              'No Saved Workouts Yet',
+              'No Favorite Exercises Yet',
               style: TextStyle(
-                fontSize:
-                    _getFontSize(context, small: 24, medium: 28, large: 32),
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey[800],
                 fontFamily: 'Poppins',
               ),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: 16),
             Text(
-              'Swipe right on exercises in your workout plans to save them here',
+              'Swipe left on exercises in your workout plans to save them here',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize:
-                    _getFontSize(context, small: 16, medium: 18, large: 20),
+                fontSize: 16,
                 color: Colors.grey[600],
                 fontFamily: 'Poppins',
               ),
@@ -231,10 +259,11 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF6e9277),
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                elevation: 2,
               ),
             ),
           ],
@@ -247,103 +276,26 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
     return RefreshIndicator(
       onRefresh: _loadSavedWorkouts,
       color: Color(0xFF6e9277),
-      child: SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(_getCardPadding(context)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header section
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF6e9277).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    Icons.favorite,
-                    color: Color(0xFF6e9277),
-                    size: 28,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Favorite Exercises',
-                        style: TextStyle(
-                          fontSize: _getFontSize(context,
-                              small: 20, medium: 24, large: 28),
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                      Text(
-                        '${_savedWorkouts.length} saved exercises',
-                        style: TextStyle(
-                          fontSize: _getFontSize(context,
-                              small: 14, medium: 16, large: 18),
-                          color: Colors.grey[600],
-                          fontFamily: 'Poppins',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 24),
-
-            // Workouts grid/list
-            _isLargeScreen(context)
-                ? _buildWorkoutsGrid()
-                : _buildWorkoutsColumn(),
-          ],
-        ),
+      child: ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: _savedWorkouts.length,
+        itemBuilder: (context, index) {
+          return _buildExerciseCard(_savedWorkouts[index]);
+        },
       ),
     );
   }
 
-  Widget _buildWorkoutsGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.1,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: _savedWorkouts.length,
-      itemBuilder: (context, index) {
-        return _buildWorkoutCard(_savedWorkouts[index], context);
-      },
-    );
-  }
-
-  Widget _buildWorkoutsColumn() {
-    return Column(
-      children: _savedWorkouts.map((workout) {
-        return _buildWorkoutCard(workout, context);
-      }).toList(),
-    );
-  }
-
-  Widget _buildWorkoutCard(Map<String, dynamic> workout, BuildContext context) {
+  Widget _buildExerciseCard(Map<String, dynamic> workout) {
     return Container(
-      margin: EdgeInsets.only(bottom: _isSmallScreen(context) ? 12 : 16),
+      margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
             offset: Offset(0, 4),
           ),
         ],
@@ -351,9 +303,9 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with delete button
+          // Header
           Container(
-            padding: EdgeInsets.all(_isSmallScreen(context) ? 16 : 20),
+            padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -364,14 +316,14 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                 ],
               ),
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(8),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Color(0xFF6e9277),
                     borderRadius: BorderRadius.circular(12),
@@ -379,10 +331,10 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                   child: Icon(
                     Icons.fitness_center,
                     color: Colors.white,
-                    size: 20,
+                    size: 24,
                   ),
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,18 +342,17 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                       Text(
                         workout['exerciseName'] ?? 'Unknown Exercise',
                         style: TextStyle(
-                          fontSize: _getFontSize(context,
-                              small: 16, medium: 18, large: 20),
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey[800],
                           fontFamily: 'Poppins',
                         ),
                       ),
+                      SizedBox(height: 4),
                       Text(
                         'Saved on ${_formatDate(workout['savedAt'])}',
                         style: TextStyle(
-                          fontSize: _getFontSize(context,
-                              small: 12, medium: 13, large: 14),
+                          fontSize: 14,
                           color: Colors.grey[600],
                           fontFamily: 'Poppins',
                         ),
@@ -416,6 +367,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                     color: Colors.red[400],
                     size: 24,
                   ),
+                  tooltip: 'Remove from favorites',
                 ),
               ],
             ),
@@ -423,28 +375,25 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
 
           // Exercise details
           Padding(
-            padding: EdgeInsets.all(_isSmallScreen(context) ? 16 : 20),
+            padding: EdgeInsets.all(20),
             child: Column(
               children: [
-                _buildWorkoutDetail(
+                _buildDetailRow(
                   Icons.repeat,
                   'Sets & Reps',
                   workout['setsAndReps'] ?? 'N/A',
-                  context,
                 ),
-                SizedBox(height: 12),
-                _buildWorkoutDetail(
+                SizedBox(height: 16),
+                _buildDetailRow(
                   Icons.timer,
                   'Rest Period',
                   workout['restPeriod'] ?? 'N/A',
-                  context,
                 ),
-                SizedBox(height: 12),
-                _buildWorkoutDetail(
+                SizedBox(height: 16),
+                _buildDetailRow(
                   Icons.info_outline,
                   'Form Tips',
                   workout['formTips'] ?? 'N/A',
-                  context,
                 ),
               ],
             ),
@@ -454,24 +403,23 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
     );
   }
 
-  Widget _buildWorkoutDetail(
-      IconData icon, String label, String value, BuildContext context) {
+  Widget _buildDetailRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: EdgeInsets.all(6),
+          padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Color(0xFF6e9277).withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
-            size: _isSmallScreen(context) ? 16 : 18,
+            size: 20,
             color: Color(0xFF6e9277),
           ),
         ),
-        SizedBox(width: 12),
+        SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,8 +427,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize:
-                      _getFontSize(context, small: 12, medium: 13, large: 14),
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Colors.grey[600],
                   fontFamily: 'Poppins',
@@ -490,8 +437,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
               Text(
                 value,
                 style: TextStyle(
-                  fontSize:
-                      _getFontSize(context, small: 14, medium: 15, large: 16),
+                  fontSize: 16,
                   color: Colors.grey[800],
                   fontFamily: 'Poppins',
                 ),
