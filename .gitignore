@@ -51,7 +51,7 @@ backend/serviceAccountKeyNew.json
 .env
 
 #firebase_options.dart
-firebase_options.dart
+lib/firebase_options.dart
 
 # YouTube API keys and sensitive files
 lib/services/youtube_service.dart
