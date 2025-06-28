@@ -67,18 +67,24 @@ Workout Schedule Based On Current Day:
 
 List Of Exercises Names Based On Body Part:
 1. Chest:
+    - Smith Machine Bench Press
     - Bench Press
     - Dumbell bench press
+    - Seated Bench Press (Machine)
     - Incline bench press
     - Incline dumbell press
+    - Incline Smith Machine Bench Press
     - Pec Fly
     - Dumbell Fly
     - Cable Fly
-    - Dips
+    
 
 2. Back:
-    - Lat Pull Downs
-    - Cable Rows
+    - Wide Grip Lat Pull Downs
+    - V-Bar Pull Downs
+    - Wide Grip Cable Rows
+    - V-Bar Cable Rows
+    - Lying Rows (Machine)
     - Barbell Rows
     - Dumbell Rows
     - Rope Pull Downs
@@ -87,37 +93,53 @@ List Of Exercises Names Based On Body Part:
 
 3. Biceps:
     - Barbell Curls
+    - EZ Bar Curls
     - Dumbell Curls
-    - Wide Grip Curls 
+    - Cable Bar Curls
+    - Seated Wide Grip Curls 
     - Hammer Curls
     - Preacher Curls
+    - Preacher Dumbell Curls
     - Concentration Curls
     - Rope Hammer Curls
 
 4. Triceps:
-    - Tricep Rope Extensions
-    - Tricep Cable Push Downs
-    - Tricep Close Grip Cable Push Downs
+    - Tricep Push Downs
+    - Tricep V-Bar Push Downs
+    - Tricep Rope Push Downs
+    - Tricep Overhead Extension
+    - Tricep Overhead Rope Extension
     - Dumbell Tricep Extensions
+    - Dumbell Tricep Single Hand Extensions
     - Barbell Skull Crushers
+    - Incline Skull Crushers
+    - Tricep Dips
 
 5. Shoulders:
     - Barbell Shoulder Press
     - Dumbell Shoulder Press
     - Barbell Lateral Raises
     - Dumbell Lateral Raises
+    - Cable Lateral Raises
     - Barbell Front Raises
     - Dumbell Front Raises
     - Dumbell Reverse Flys
     - Machine Reverse Flys
+    - Rope Facepulls
+    
 
 6. Legs:
     - Barbell Squats
+    - Smith Machine Squats
     - Hack Squats
+    - Dumbell Squats
     - Leg Press (Machine)
     - Leg Extensions (Machine)
     - Leg Hamstring Curls (Machine)
+    - Dumbell Romanian Deadlifts
+    - Dumbell Lunges
     - Leg Calf Raises (Machine)
+    
      
 Please provide a detailed workout plan that includes:
 1. Exercise name (adjusted based on the list of exercises names)
