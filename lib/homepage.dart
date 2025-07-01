@@ -22,6 +22,8 @@ class _HomePageState extends State<HomePage> {
   final int dailyGoal = 10000;
   late HealthConnectService _healthConnectService;
   DateTime? _lastResetDate;
+  int _currentSteps = 0; // Add this to track current steps
+  bool _isLoadingSteps = true; // Add loading state
 
   // List of widgets for each tab
   late final List<Widget> _widgetOptions;
@@ -31,6 +33,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _healthConnectService = HealthConnectService();
     _checkAndResetDailySteps().then((_) {
+      _loadInitialSteps(); // Load initial steps from Firebase
       _initHealthConnect();
     });
     _widgetOptions = <Widget>[
@@ -78,6 +81,45 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     ];
+  }
+
+  // Add method to load initial steps from Firebase
+  Future<void> _loadInitialSteps() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Get the profile document from the profile subcollection
+        final profileSnapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('profile')
+            .limit(1)
+            .get();
+
+        if (profileSnapshot.docs.isNotEmpty) {
+          final profileDoc = profileSnapshot.docs[0];
+          final data = profileDoc.data();
+
+          setState(() {
+            _currentSteps = data['dailySteps'] ?? 0;
+            _isLoadingSteps = false;
+          });
+        } else {
+          setState(() {
+            _isLoadingSteps = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoadingSteps = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading initial steps: $e');
+      setState(() {
+        _isLoadingSteps = false;
+      });
+    }
   }
 
   Future<void> _initHealthConnect() async {
@@ -163,330 +205,375 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: StreamBuilder<int>(
-            stream: _healthConnectService.stepCountStream,
-            builder: (context, snapshot) {
-              int steps = 0;
-              if (snapshot.hasData) {
-                steps = snapshot.data!;
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Greeting
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0, bottom: 18),
-                    child: Text(
-                      'Welcome back!',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  // Step Count Card
-                  Card(
-                    color: Color(0xFF232323),
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Step Count',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Poppins',
-                              color: Colors.white,
-                            ),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: user != null
+                ? FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('profile')
+                    .limit(1)
+                    .snapshots()
+                : const Stream.empty(),
+            builder: (context, firebaseSnapshot) {
+              return StreamBuilder<int>(
+                stream: _healthConnectService.stepCountStream,
+                builder: (context, healthSnapshot) {
+                  int steps = _currentSteps; // Start with Firebase data
+
+                  // Update with Firebase data if available
+                  if (firebaseSnapshot.hasData &&
+                      firebaseSnapshot.data!.docs.isNotEmpty) {
+                    final profileData = firebaseSnapshot.data!.docs[0].data();
+                    steps = profileData['dailySteps'] ?? steps;
+                    _currentSteps = steps;
+                  }
+
+                  // Update with Health Connect data if available (takes precedence)
+                  if (healthSnapshot.hasData) {
+                    steps = healthSnapshot.data!;
+                    _currentSteps = steps;
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Greeting
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0, bottom: 18),
+                        child: Text(
+                          'Welcome back!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
                           ),
-                          SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ),
+                      ),
+                      // Step Count Card
+                      Card(
+                        color: Color(0xFF232323),
+                        elevation: 6,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18.0),
+                          child: Column(
                             children: [
-                              TweenAnimationBuilder<double>(
-                                tween: Tween<double>(
-                                  begin: 0,
-                                  end: steps / dailyGoal,
+                              Text(
+                                'Step Count',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Poppins',
+                                  color: Colors.white,
                                 ),
-                                duration: Duration(milliseconds: 800),
-                                builder: (context, value, child) {
-                                  return SizedBox(
-                                    width: 70,
-                                    height: 70,
-                                    child: CircularProgressIndicator(
-                                      value: value,
-                                      backgroundColor: Colors.grey[800],
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF6e9277),
-                                      ),
-                                      strokeWidth: 8,
-                                    ),
-                                  );
-                                },
                               ),
-                              SizedBox(width: 18),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    '$steps',
-                                    style: TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      fontFamily: 'Poppins',
-                                    ),
+                                  _isLoadingSteps
+                                      ? SizedBox(
+                                          width: 70,
+                                          height: 70,
+                                          child: CircularProgressIndicator(
+                                            backgroundColor: Colors.grey[800],
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF6e9277),
+                                            ),
+                                            strokeWidth: 8,
+                                          ),
+                                        )
+                                      : TweenAnimationBuilder<double>(
+                                          tween: Tween<double>(
+                                            begin: 0,
+                                            end: steps / dailyGoal,
+                                          ),
+                                          duration: Duration(milliseconds: 800),
+                                          builder: (context, value, child) {
+                                            return SizedBox(
+                                              width: 70,
+                                              height: 70,
+                                              child: CircularProgressIndicator(
+                                                value: value,
+                                                backgroundColor:
+                                                    Colors.grey[800],
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                        Color>(
+                                                  Color(0xFF6e9277),
+                                                ),
+                                                strokeWidth: 8,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                  SizedBox(width: 18),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _isLoadingSteps ? '...' : '$steps',
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
+                                      Text(
+                                        'steps',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white70,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    'steps',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.white70,
-                                      fontFamily: 'Inter',
+                                  SizedBox(width: 18),
+                                  OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      side:
+                                          BorderSide(color: Color(0xFF6e9277)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      backgroundColor: Colors.transparent,
+                                    ),
+                                    onPressed: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => StepCountPage(),
+                                        ),
+                                      );
+                                      // Refresh steps when returning from step count page
+                                      _loadInitialSteps();
+                                    },
+                                    child: Text(
+                                      'View More',
+                                      style: TextStyle(
+                                        color: Color(0xFF6e9277),
+                                        fontFamily: 'Inter',
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
-                              ),
-                              SizedBox(width: 18),
-                              OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Color(0xFF6e9277)),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  backgroundColor: Colors.transparent,
-                                ),
-                                onPressed: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => StepCountPage(),
-                                    ),
-                                  );
-                                },
-                                child: Text(
-                                  'View More',
-                                  style: TextStyle(
-                                    color: Color(0xFF6e9277),
-                                    fontFamily: 'Inter',
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
                               ),
                             ],
                           ),
+                        ),
+                      ),
+                      SizedBox(height: 18),
+                      // Daily Goal & Weekly Progress Cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Card(
+                              color: Color(0xFF33443c),
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 18, horizontal: 10),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Daily Goal',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      '${steps.clamp(0, dailyGoal)} / $dailyGoal',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Card(
+                              color: Color(0xFF33443c),
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 18, horizontal: 10),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Weekly Progress',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      '35,000 steps',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontFamily: 'Inter',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                  SizedBox(height: 18),
-                  // Daily Goal & Weekly Progress Cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Card(
-                          color: Color(0xFF33443c),
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                      SizedBox(height: 22),
+                      // Create Workout Card
+                      Card(
+                        color: Colors.white,
+                        elevation: 7,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Container(
+                          width: double.infinity,
+                          constraints: BoxConstraints(
+                            maxWidth: 500,
+                            minHeight: 180,
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 18, horizontal: 10),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Daily Goal',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontFamily: 'Poppins',
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            image: DecorationImage(
+                              image: AssetImage('assets/JPG/workout_image.jpg'),
+                              fit: BoxFit.cover,
+                              colorFilter: ColorFilter.mode(
+                                Colors.black.withOpacity(0.18),
+                                BlendMode.darken,
+                              ),
+                            ),
+                          ),
+                          child: Container(
+                            padding: EdgeInsets.all(24),
+                            alignment: Alignment.bottomCenter,
+                            child: CreateWorkoutButton(
+                              userId: userId ?? '',
+                              onWorkoutCreated: (result) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => WorkoutPage(
+                                      suggestedWorkout: result['workoutPlan'],
+                                    ),
                                   ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  '${steps.clamp(0, dailyGoal)} / $dailyGoal',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
                         ),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Card(
-                          color: Color(0xFF33443c),
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 18, horizontal: 10),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Weekly Progress',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  '35,000 steps',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    fontFamily: 'Inter',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                      SizedBox(height: 18),
+                      // Saved Workouts Card
+                      Card(
+                        color: Color(0xFF6e9277),
+                        elevation: 7,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 22),
-                  // Create Workout Card
-                  Card(
-                    color: Colors.white,
-                    elevation: 7,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Container(
-                      width: double.infinity,
-                      constraints: BoxConstraints(
-                        maxWidth: 500,
-                        minHeight: 180,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        image: DecorationImage(
-                          image: AssetImage('assets/JPG/workout_image.jpg'),
-                          fit: BoxFit.cover,
-                          colorFilter: ColorFilter.mode(
-                            Colors.black.withOpacity(0.18),
-                            BlendMode.darken,
-                          ),
-                        ),
-                      ),
-                      child: Container(
-                        padding: EdgeInsets.all(24),
-                        alignment: Alignment.bottomCenter,
-                        child: CreateWorkoutButton(
-                          userId: userId ?? '',
-                          onWorkoutCreated: (result) {
+                        child: InkWell(
+                          onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => WorkoutPage(
-                                  suggestedWorkout: result['workoutPlan'],
-                                ),
+                                builder: (context) => SavedWorkoutPage(),
                               ),
                             );
                           },
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 18),
-                  // Saved Workouts Card
-                  Card(
-                    color: Color(0xFF6e9277),
-                    elevation: 7,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SavedWorkoutPage(),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Container(
+                            width: double.infinity,
+                            constraints: BoxConstraints(
+                              maxWidth: 500,
+                              minHeight: 120,
+                            ),
+                            padding: EdgeInsets.all(24),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                                SizedBox(width: 20),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Saved Workouts',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'View your favorite exercises',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(18),
-                      child: Container(
-                        width: double.infinity,
-                        constraints: BoxConstraints(
-                          maxWidth: 500,
-                          minHeight: 120,
-                        ),
-                        padding: EdgeInsets.all(24),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                Icons.favorite,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                            ),
-                            SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Saved Workouts',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      fontFamily: 'Poppins',
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'View your favorite exercises',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontFamily: 'Inter',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-                  ),
-                  SizedBox(height: 18),
-                ],
+                      SizedBox(height: 18),
+                    ],
+                  );
+                },
               );
             },
           ),

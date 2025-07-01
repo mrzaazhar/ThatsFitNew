@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class WorkoutService {
   // Configuration for real device testing
   // This should be the IP address of your development machine where the backend server is running
-  final String baseUrl = 'http://192.168.1.4:3001/api';
+  final String baseUrl = 'http://172.20.10.4:3001/api';
 
   Future<Map<String, dynamic>> createWorkout({
     required String userId,
@@ -12,20 +12,29 @@ class WorkoutService {
     try {
       print('\n=== Creating Workout Request ===');
       print('User ID: $userId');
-      print('URL: ${baseUrl}/users/$userId/create-workout');
+      print('Base URL: $baseUrl');
+      print('Full URL: ${baseUrl}/users/$userId/create-workout');
 
       if (userId.isEmpty) {
         throw Exception('User ID is empty');
       }
 
       final url = Uri.parse('$baseUrl/users/$userId/create-workout');
+      print('Parsed URL: $url');
+      print('URL scheme: ${url.scheme}');
+      print('URL host: ${url.host}');
+      print('URL port: ${url.port}');
+      print('URL path: ${url.path}');
+
       print('Making POST request to: $url');
+      print('Request headers: {"Content-Type": "application/json"}');
 
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-      ).timeout(Duration(seconds: 30));
+      ).timeout(Duration(seconds: 120));
 
+      print('Response received!');
       print('Response status code: ${response.statusCode}');
       print('Response headers: ${response.headers}');
       print('Response body: ${response.body}');
@@ -44,6 +53,7 @@ class WorkoutService {
       }
     } catch (e, stackTrace) {
       print('Error creating workout: $e');
+      print('Error type: ${e.runtimeType}');
       print('Stack trace: $stackTrace');
 
       if (e.toString().contains('SocketException') ||
