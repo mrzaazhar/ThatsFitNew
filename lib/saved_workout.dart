@@ -7,16 +7,80 @@ class SavedWorkoutPage extends StatefulWidget {
   _SavedWorkoutPageState createState() => _SavedWorkoutPageState();
 }
 
-class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
+class _SavedWorkoutPageState extends State<SavedWorkoutPage>
+    with TickerProviderStateMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _savedWorkouts = [];
 
+  // Controllers for custom routine creation
+  final TextEditingController _routineNameController = TextEditingController();
+  final TextEditingController _setsController = TextEditingController();
+  final TextEditingController _repsController = TextEditingController();
+  final TextEditingController _restTimeController = TextEditingController();
+
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  // Theme colors
+  static const Color primaryGreen = Color(0xFF00FF88);
+  static const Color darkGreen = Color(0xFF00CC6A);
+  static const Color backgroundColor = Color(0xFF0A0A0A);
+  static const Color surfaceColor = Color(0xFF1A1A1A);
+  static const Color cardColor = Color(0xFF2A2A2A);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFB0B0B0);
+
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
     _loadSavedWorkouts();
+  }
+
+  void _initializeAnimations() {
+    _fadeController = AnimationController(
+      duration: Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+
+    _slideAnimation = Tween<Offset>(
+      begin: Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _fadeController.forward();
+    _slideController.forward();
+  }
+
+  @override
+  void dispose() {
+    _routineNameController.dispose();
+    _setsController.dispose();
+    _repsController.dispose();
+    _restTimeController.dispose();
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSavedWorkouts() async {
@@ -175,6 +239,11 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
         elevation: 0,
         iconTheme: IconThemeData(color: Colors.white),
         actions: [
+          IconButton(
+            icon: Icon(Icons.fitness_center),
+            onPressed: _showCustomRoutines,
+            tooltip: 'View Custom Routines',
+          ),
           IconButton(
             icon: Icon(Icons.refresh),
             onPressed: _loadSavedWorkouts,
@@ -370,6 +439,15 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                   tooltip: 'Remove from favorites',
                 ),
                 IconButton(
+                  onPressed: () => _showCreateRoutineDialog(workout),
+                  icon: Icon(
+                    Icons.add_circle_outline,
+                    color: Color(0xFF6e9277),
+                    size: 24,
+                  ),
+                  tooltip: 'Create Custom Routine',
+                ),
+                IconButton(
                   onPressed: () =>
                       _openVideoPlayer(workout['exerciseName'] ?? 'Exercise'),
                   icon: Icon(
@@ -404,6 +482,32 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
                   Icons.info_outline,
                   'Form Tips',
                   workout['formTips'] ?? 'N/A',
+                ),
+                SizedBox(height: 20),
+                // Create Custom Routine Button
+                Container(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showCreateRoutineDialog(workout),
+                    icon: Icon(Icons.add_circle_outline, color: Colors.white),
+                    label: Text(
+                      'Create Custom Routine',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF6e9277),
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -526,5 +630,375 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage> {
 
   Future<void> _openVideoPlayer(String exerciseName) async {
     // Implementation of _openVideoPlayer method
+  }
+
+  Future<void> _showCreateRoutineDialog(Map<String, dynamic> workout) async {
+    // Pre-fill controllers with current workout data
+    _routineNameController.text = '${workout['exerciseName']} Custom Routine';
+    _setsController.text = '3'; // Default values
+    _repsController.text = '12';
+    _restTimeController.text = '60';
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(Icons.fitness_center, color: Color(0xFF6e9277)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Create Custom Routine',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Exercise: ${workout['exerciseName']}',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Color(0xFF6e9277),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    TextField(
+                      controller: _routineNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Routine Name',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: Icon(Icons.edit, color: Color(0xFF6e9277)),
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _setsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Sets',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              prefixIcon:
+                                  Icon(Icons.repeat, color: Color(0xFF6e9277)),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _repsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Reps',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              prefixIcon: Icon(Icons.fitness_center,
+                                  color: Color(0xFF6e9277)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    TextField(
+                      controller: _restTimeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Rest Time (seconds)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: Icon(Icons.timer, color: Color(0xFF6e9277)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (_routineNameController.text.trim().isNotEmpty &&
+                        _setsController.text.trim().isNotEmpty &&
+                        _repsController.text.trim().isNotEmpty &&
+                        _restTimeController.text.trim().isNotEmpty) {
+                      Navigator.of(context).pop({
+                        'routineName': _routineNameController.text.trim(),
+                        'sets': int.tryParse(_setsController.text) ?? 3,
+                        'reps': int.tryParse(_repsController.text) ?? 12,
+                        'restTime':
+                            int.tryParse(_restTimeController.text) ?? 60,
+                      });
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Please fill in all fields'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF6e9277),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Create Routine',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      await _saveCustomRoutine(workout, result);
+    }
+  }
+
+  Future<void> _saveCustomRoutine(
+      Map<String, dynamic> workout, Map<String, dynamic> customData) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Create the custom routine data
+        final routineData = {
+          'routineName': customData['routineName'],
+          'exerciseName': workout['exerciseName'],
+          'originalExerciseId': workout['id'],
+          'sets': customData['sets'],
+          'reps': customData['reps'],
+          'restTime': customData['restTime'],
+          'formTips': workout['formTips'] ?? '',
+          'workoutType': 'custom_routine',
+          'createdAt': FieldValue.serverTimestamp(),
+          'userId': user.uid,
+        };
+
+        // Save to Firestore
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('custom_routines')
+            .add(routineData);
+
+        _showSnackBar('Custom routine created successfully!', Colors.green);
+
+        // Clear the controllers
+        _routineNameController.clear();
+        _setsController.clear();
+        _repsController.clear();
+        _restTimeController.clear();
+      }
+    } catch (e) {
+      print('Error saving custom routine: $e');
+      _showSnackBar('Failed to create custom routine', Colors.red);
+    }
+  }
+
+  Future<void> _showCustomRoutines() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        _showSnackBar('Please log in to view custom routines', Colors.red);
+        return;
+      }
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+          ),
+        ),
+      );
+
+      // Fetch custom routines from Firestore
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('custom_routines')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      final routines = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+        };
+      }).toList();
+
+      if (routines.isEmpty) {
+        _showSnackBar('No custom routines found', Colors.orange);
+        return;
+      }
+
+      // Show custom routines dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.fitness_center, color: Color(0xFF6e9277)),
+              SizedBox(width: 8),
+              Text(
+                'My Custom Routines',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            width: double.maxFinite,
+            height: 400,
+            child: ListView.builder(
+              itemCount: routines.length,
+              itemBuilder: (context, index) {
+                final routine = routines[index];
+                return Card(
+                  margin: EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF6e9277).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.fitness_center,
+                        color: Color(0xFF6e9277),
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      routine['routineName'] ?? 'Unnamed Routine',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Exercise: ${routine['exerciseName']}',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                          ),
+                        ),
+                        Text(
+                          '${routine['sets']} sets × ${routine['reps']} reps • ${routine['restTime']}s rest',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete_outline, color: Colors.red[400]),
+                      onPressed: () =>
+                          _deleteCustomRoutine(routine['id'], context),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      print('Error loading custom routines: $e');
+      _showSnackBar('Failed to load custom routines', Colors.red);
+    }
+  }
+
+  Future<void> _deleteCustomRoutine(
+      String routineId, BuildContext context) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('custom_routines')
+            .doc(routineId)
+            .delete();
+
+        _showSnackBar('Custom routine deleted successfully!', Colors.green);
+        Navigator.of(context).pop(); // Close the dialog
+        _showCustomRoutines(); // Refresh the list
+      }
+    } catch (e) {
+      print('Error deleting custom routine: $e');
+      _showSnackBar('Failed to delete custom routine', Colors.red);
+    }
   }
 }

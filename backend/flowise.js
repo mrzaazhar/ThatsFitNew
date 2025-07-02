@@ -141,19 +141,26 @@ List Of Exercises Names Based On Body Part:
     - Leg Calf Raises (Machine)
     
      
-Please provide a detailed workout plan that includes:
-1. Exercise name (adjusted based on the list of exercises names)
+Please provide THREE different workout options for the user to choose from. Each workout should include:
+1. Exercise name (from the list of exercises names)
 2. Sets and reps (adjusted based on step count)
 3. Rest periods (adjusted based on experience level)
 4. Brief form tips
 
-Format the response in a clear, structured way that's easy to read. 
-Please ensure that the exercise name is in the list of exercises names.
-For each body part's exercise, please provide 3-4 exercises.
-Please randomize the exercises for each body part when a new workout is created.
-Please format the response as:
+IMPORTANT GUIDELINES:
+- Create exactly 3 workout options (Workout 1, Workout 2, Workout 3)
+- For each body part, include 3-4 exercises (minimum 3, maximum 4)
+- Randomize the exercises for each workout to provide variety
+- Ensure no workout has the exact same combination of exercises
+- Use exercises ONLY from the provided list
+- Adjust intensity based on step count guidelines
+- Adjust rest periods based on training experience
 
-Workout Plan:
+Please format the response exactly as follows:
+
+WORKOUT OPTIONS:
+
+Workout 1:
 1. [Exercise Name] 
    -[Sets and reps]
    -[Rest periods]
@@ -163,7 +170,36 @@ Workout Plan:
    -[Sets and reps]
    -[Rest periods]
    -[Brief form tips]
-...`;
+
+[Continue with 3-4 exercises for each body part...]
+
+Workout 2:
+1. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+
+2. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+
+[Continue with 3-4 exercises for each body part...]
+
+Workout 3:
+1. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+
+2. [Exercise Name] 
+   -[Sets and reps]
+   -[Rest periods]
+   -[Brief form tips]
+
+[Continue with 3-4 exercises for each body part...]
+
+Please ensure each workout option is different and provides variety while maintaining the appropriate intensity and rest periods for the user's fitness level and daily activity.`;
 
         // Send the prompt template to Flowise
         console.log('Preparing to call Flowise with prompt template');
@@ -177,7 +213,7 @@ Workout Plan:
         
         // Extract workout summary
         const workoutSummary = {
-            title: `${flowiseData.currentDay}'s Workout Plan`,
+            title: `${flowiseData.currentDay}'s Workout Options`,
             subtitle: `For ${flowiseData.trainingExperience} Level`,
             intensity: flowiseData.stepCount < 5000 ? 'High Intensity' : 
                      flowiseData.stepCount > 7000 ? 'Light Intensity' : 'Moderate Intensity',
@@ -186,26 +222,45 @@ Workout Plan:
                         flowiseData.trainingExperience === 'Intermediate' ? '60-90 seconds' : '30-60 seconds'
         };
 
-        // Parse exercises into a clean format
-        const exercises = [];
-        const exerciseRegex = /\d+\.\s*([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)/g;
-        let match;
+        // Parse multiple workout options
+        const workoutOptions = [];
         
-        while ((match = exerciseRegex.exec(workoutText)) !== null) {
-            exercises.push({
-                name: match[1].trim(),
-                details: {
-                    setsAndReps: match[2].trim().replace(/^-\s*/, ''),
-                    restPeriod: match[3].trim().replace(/^-\s*/, ''),
-                    formTips: match[4].trim().replace(/^-\s*/, '')
-                }
-            });
+        // Split the text by workout sections
+        const workoutSections = workoutText.split(/Workout \d+:/);
+        
+        // Process each workout section (skip the first empty element)
+        for (let i = 1; i < workoutSections.length; i++) {
+            const section = workoutSections[i];
+            const exercises = [];
+            
+            // Parse exercises in this workout section
+            const exerciseRegex = /\d+\.\s*([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)\n\s*-([^\n]+)/g;
+            let match;
+            
+            while ((match = exerciseRegex.exec(section)) !== null) {
+                exercises.push({
+                    name: match[1].trim(),
+                    details: {
+                        setsAndReps: match[2].trim().replace(/^-\s*/, ''),
+                        restPeriod: match[3].trim().replace(/^-\s*/, ''),
+                        formTips: match[4].trim().replace(/^-\s*/, '')
+                    }
+                });
+            }
+            
+            if (exercises.length > 0) {
+                workoutOptions.push({
+                    id: i,
+                    name: `Workout ${i}`,
+                    exercises: exercises
+                });
+            }
         }
 
         // Create the final structured response
         const formattedResponse = {
             summary: workoutSummary,
-            exercises: exercises
+            workoutOptions: workoutOptions
         };
 
         return { workoutPlan: formattedResponse };
