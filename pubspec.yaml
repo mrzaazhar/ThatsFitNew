@@ -75,6 +75,7 @@ flutter:
       - assets/PNG/background.png
       - assets/JPG/workout_image.jpg
       - assets/PNG/logo.png
+      - assets/JPG/Gym.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

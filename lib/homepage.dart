@@ -433,14 +433,37 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                     SizedBox(height: 8),
-                                    Text(
-                                      '35,000 steps',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        fontFamily: 'Inter',
-                                      ),
+                                    StreamBuilder<
+                                        QuerySnapshot<Map<String, dynamic>>>(
+                                      stream: user != null
+                                          ? FirebaseFirestore.instance
+                                              .collection('users')
+                                              .doc(user.uid)
+                                              .collection('profile')
+                                              .limit(1)
+                                              .snapshots()
+                                          : const Stream.empty(),
+                                      builder: (context, snapshot) {
+                                        int weeklySteps = 0;
+
+                                        if (snapshot.hasData &&
+                                            snapshot.data!.docs.isNotEmpty) {
+                                          final profileData =
+                                              snapshot.data!.docs[0].data();
+                                          weeklySteps =
+                                              profileData['weeklySteps'] ?? 0;
+                                        }
+
+                                        return Text(
+                                          '${weeklySteps.toString()} steps',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            fontFamily: 'Inter',
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),
@@ -466,7 +489,7 @@ class _HomePageState extends State<HomePage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(18),
                             image: DecorationImage(
-                              image: AssetImage('assets/JPG/workout_image.jpg'),
+                              image: AssetImage('assets/JPG/Gym.jpg'),
                               fit: BoxFit.cover,
                               colorFilter: ColorFilter.mode(
                                 Colors.black.withOpacity(0.18),
@@ -494,9 +517,85 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       SizedBox(height: 18),
+                      // Set Weekly Goals Card
+                      Card(
+                        color: Colors.white,
+                        elevation: 7,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Container(
+                          width: double.infinity,
+                          constraints: BoxConstraints(
+                            maxWidth: 500,
+                            minHeight: 180,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            image: DecorationImage(
+                              image: AssetImage('assets/JPG/workout_image.jpg'),
+                              fit: BoxFit.cover,
+                              colorFilter: ColorFilter.mode(
+                                Colors.black.withOpacity(0.18),
+                                BlendMode.darken,
+                              ),
+                            ),
+                          ),
+                          child: Container(
+                            padding: EdgeInsets.all(24),
+                            alignment: Alignment.bottomCenter,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // TODO: Navigate to weekly goals page
+                                // Navigator.push(
+                                //   context,
+                                //   MaterialPageRoute(
+                                //     builder: (context) => WeeklyGoalsPage(),
+                                //   ),
+                                // );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    Color.fromARGB(255, 124, 49, 164),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 4,
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.flag,
+                                    size: 24,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Set Your Weekly Goals',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Poppins',
+                                      color: Colors.white,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 18),
                       // Saved Workouts Card
                       Card(
-                        color: Color(0xFF6e9277),
+                        color: Color.fromARGB(133, 165, 72, 198),
                         elevation: 7,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
