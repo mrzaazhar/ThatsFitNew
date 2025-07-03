@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'widgets/workout_video_player.dart';
 import 'services/youtube_service.dart';
+import 'services/workout_recording_service.dart';
 
 class WorkoutPage extends StatefulWidget {
   final Map<String, dynamic>? suggestedWorkout;
@@ -349,14 +350,17 @@ class _WorkoutPageState extends State<WorkoutPage>
                     color: Color(0xFF6e9277),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    'START',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Poppins',
-                      fontSize: _getFontSize(context,
-                          small: 12, medium: 14, large: 16),
+                  child: GestureDetector(
+                    onTap: () => _showWorkoutCompletionDialog(workout),
+                    child: Text(
+                      'START',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Poppins',
+                        fontSize: _getFontSize(context,
+                            small: 12, medium: 14, large: 16),
+                      ),
                     ),
                   ),
                 ),
@@ -948,5 +952,110 @@ class _WorkoutPageState extends State<WorkoutPage>
         videoId: '1XEDaV7ZZqs', // Specific video ID for Deadlift
       ),
     ];
+  }
+
+  /// Show workout completion dialog
+  Future<void> _showWorkoutCompletionDialog(
+      Map<String, dynamic> workout) async {
+    final exercises = workout['exercises'] ?? [];
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Color(0xFF6e9277)),
+            SizedBox(width: 8),
+            Text(
+              'Complete Workout',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Did you complete "${workout['name'] ?? 'this workout'}"?',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '${exercises.length} exercises • ~${(exercises.length * 2.5).round()} minutes',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Not Yet',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _recordCompletedWorkout(workout);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF6e9277),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              'Complete',
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Record completed workout for weekly goals tracking
+  Future<void> _recordCompletedWorkout(Map<String, dynamic> workout) async {
+    try {
+      final exercises = workout['exercises'] ?? [];
+      final workoutName = workout['name'] ?? 'Unknown Workout';
+
+      // Calculate estimated duration (2-3 minutes per exercise)
+      final estimatedDuration = exercises.length * 2.5;
+
+      await WorkoutRecordingService.recordWorkout(
+        workoutName: workoutName,
+        exercises: exercises,
+        duration: estimatedDuration.round(),
+        notes: 'Completed via workout plan',
+      );
+
+      _showSnackBar('Workout completed! Great job! 💪', Colors.green);
+    } catch (e) {
+      print('Error recording workout: $e');
+      _showSnackBar(
+          'Workout completed but failed to record progress.', Colors.orange);
+    }
   }
 }

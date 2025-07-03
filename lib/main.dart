@@ -6,10 +6,15 @@ import 'package:flutter_application_1/homepage.dart';
 import 'firebase_options.dart';
 import 'signup_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_application_1/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Initialize notification service
+  await NotificationService.initialize();
+
   runApp(const MyApp());
 }
 
