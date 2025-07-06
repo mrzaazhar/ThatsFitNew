@@ -5,6 +5,7 @@ import 'main.dart';
 import 'step_count.dart';
 import 'workout.dart';
 import 'saved_workout.dart';
+import 'weekly_goals.dart';
 import 'widgets/create_workout_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
@@ -546,13 +547,12 @@ class _HomePageState extends State<HomePage> {
                             alignment: Alignment.bottomCenter,
                             child: ElevatedButton(
                               onPressed: () {
-                                // TODO: Navigate to weekly goals page
-                                // Navigator.push(
-                                //   context,
-                                //   MaterialPageRoute(
-                                //     builder: (context) => WeeklyGoalsPage(),
-                                //   ),
-                                // );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => WeeklyGoalsPage(),
+                                  ),
+                                );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:

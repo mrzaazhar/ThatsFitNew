@@ -997,6 +997,75 @@ class _WorkoutPageState extends State<WorkoutPage>
                 fontSize: 14,
               ),
             ),
+            SizedBox(height: 12),
+            // Add weekly progress preview
+            FutureBuilder<Map<String, dynamic>>(
+              future: _getWeeklyProgress(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  final progress = snapshot.data!;
+                  final currentWorkouts = progress['completedWorkouts'] ?? 0;
+                  final workoutGoal = progress['workoutGoal'] ?? 0;
+                  final progressPercentage = workoutGoal > 0
+                      ? ((currentWorkouts + 1) / workoutGoal * 100)
+                          .clamp(0.0, 100.0)
+                      : 0.0;
+
+                  return Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF6e9277).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Weekly Progress',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: LinearProgressIndicator(
+                                value: progressPercentage / 100,
+                                backgroundColor: Colors.grey[300],
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF6e9277)),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              '${currentWorkouts + 1}/$workoutGoal',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '${progressPercentage.toInt()}% of weekly goal',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return SizedBox.shrink();
+              },
+            ),
           ],
         ),
         actions: [
@@ -1044,6 +1113,7 @@ class _WorkoutPageState extends State<WorkoutPage>
       // Calculate estimated duration (2-3 minutes per exercise)
       final estimatedDuration = exercises.length * 2.5;
 
+      // Record the workout
       await WorkoutRecordingService.recordWorkout(
         workoutName: workoutName,
         exercises: exercises,
@@ -1051,11 +1121,242 @@ class _WorkoutPageState extends State<WorkoutPage>
         notes: 'Completed via workout plan',
       );
 
-      _showSnackBar('Workout completed! Great job! 💪', Colors.green);
+      // Update weekly progress and show celebration
+      await _updateWeeklyProgress(workoutName, exercises.length);
+
+      // Show completion celebration
+      _showCompletionCelebration(workoutName, exercises.length);
     } catch (e) {
       print('Error recording workout: $e');
       _showSnackBar(
           'Workout completed but failed to record progress.', Colors.orange);
     }
+  }
+
+  /// Update weekly progress and check goal completion
+  Future<void> _updateWeeklyProgress(
+      String workoutName, int exerciseCount) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Get current weekly progress
+      final progress = await _getWeeklyProgress();
+      final currentWorkouts = progress['completedWorkouts'] ?? 0;
+      final workoutGoal = progress['workoutGoal'] ?? 0;
+      final newTotal = currentWorkouts + 1;
+
+      // Check if this completes the weekly goal
+      bool goalCompleted = workoutGoal > 0 && newTotal >= workoutGoal;
+      bool goalExceeded = workoutGoal > 0 && newTotal > workoutGoal;
+
+      // Show appropriate message
+      if (goalCompleted && !goalExceeded) {
+        _showGoalCompletionCelebration(workoutGoal);
+      } else if (goalExceeded) {
+        _showSnackBar(
+            'Amazing! You exceeded your weekly goal! 🎉', Colors.green);
+      } else {
+        _showSnackBar('Workout completed! Great job! 💪', Colors.green);
+      }
+
+      // Add haptic feedback
+      HapticFeedback.mediumImpact();
+    } catch (e) {
+      print('Error updating weekly progress: $e');
+    }
+  }
+
+  /// Get current weekly progress for display
+  Future<Map<String, dynamic>> _getWeeklyProgress() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return {};
+
+      final now = DateTime.now();
+      final weekStart = now.subtract(Duration(days: now.weekday - 1));
+      final weekEnd = now.add(Duration(days: 7 - now.weekday));
+
+      // Get completed workouts for the week
+      final workoutsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .collection('workout_history')
+          .where('completedAt', isGreaterThanOrEqualTo: weekStart)
+          .where('completedAt', isLessThanOrEqualTo: weekEnd)
+          .get();
+
+      int completedWorkouts = workoutsSnapshot.docs.length;
+
+      // Get weekly goals
+      final goalsDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .collection('Weekly_Goals')
+          .doc('JNen8TcNA9IJiveXC6AX')
+          .get();
+
+      int workoutGoal = 0;
+      if (goalsDoc.exists) {
+        final goalsData = goalsDoc.data()!;
+        workoutGoal = goalsData['workoutGoal'] ?? 0;
+      }
+
+      return {
+        'completedWorkouts': completedWorkouts,
+        'workoutGoal': workoutGoal,
+      };
+    } catch (e) {
+      print('Error getting weekly progress: $e');
+      return {};
+    }
+  }
+
+  /// Show completion celebration
+  void _showCompletionCelebration(String workoutName, int exerciseCount) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xFF6e9277).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Icon(
+                  Icons.fitness_center,
+                  color: Color(0xFF6e9277),
+                  size: 48,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Workout Complete!',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '$workoutName',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '$exerciseCount exercises completed',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF6e9277),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  'Continue',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Show goal completion celebration
+  void _showGoalCompletionCelebration(int goal) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Icon(
+                  Icons.emoji_events,
+                  color: Colors.amber[700],
+                  size: 48,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Weekly Goal Achieved! 🎉',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'You completed $goal workouts this week!',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.amber[700],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  'Awesome!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -13,18 +13,20 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
 
   // Controllers for goal inputs
   final TextEditingController _stepGoalController = TextEditingController();
-  final TextEditingController _workoutGoalController = TextEditingController();
 
-  // Selected body part for focus
-  String _selectedBodyPart = 'Full Body';
-  final List<String> _bodyParts = [
-    'Full Body',
+  // Weekly schedule data
+  Map<String, Map<String, dynamic>> _weeklySchedule = {};
+  DateTime _weekStart = DateTime.now();
+  DateTime _weekEnd = DateTime.now().add(Duration(days: 6));
+
+  // Available body parts
+  List<String> _availableBodyParts = [
     'Chest',
     'Back',
-    'Arms',
+    'Bicep',
+    'Tricep',
+    'Shoulder',
     'Legs',
-    'Shoulders',
-    'Core'
   ];
 
   // Goal tracking variables
@@ -35,14 +37,60 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
   @override
   void initState() {
     super.initState();
+    _initializeWeekSchedule();
     _loadCurrentGoals();
   }
 
   @override
   void dispose() {
     _stepGoalController.dispose();
-    _workoutGoalController.dispose();
     super.dispose();
+  }
+
+  void _initializeWeekSchedule() {
+    _weekStart = DateTime.now();
+    _weekEnd = _weekStart.add(Duration(days: 6));
+
+    // Initialize schedule for each day of the week
+    for (int i = 0; i < 7; i++) {
+      DateTime day = _weekStart.add(Duration(days: i));
+      String dayKey = _formatDate(day);
+      String dayName = _getDayName(day.weekday);
+
+      _weeklySchedule[dayKey] = {
+        'dayName': dayName,
+        'date': dayKey,
+        'isWorkoutDay': false,
+        'bodyParts': [],
+        'workoutTime': '09:00',
+        'isCompleted': false,
+      };
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case 1:
+        return 'Monday';
+      case 2:
+        return 'Tuesday';
+      case 3:
+        return 'Wednesday';
+      case 4:
+        return 'Thursday';
+      case 5:
+        return 'Friday';
+      case 6:
+        return 'Saturday';
+      case 7:
+        return 'Sunday';
+      default:
+        return '';
+    }
   }
 
   Future<void> _loadCurrentGoals() async {
@@ -54,21 +102,29 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       final user = _auth.currentUser;
       if (user != null) {
         // Get current week's goals
-        final weekStart = _getWeekStart();
         final goalsDoc = await _firestore
             .collection('users')
-            .doc(user.uid)
-            .collection('weekly_goals')
-            .doc(weekStart)
+            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+            .collection('Weekly_Goals')
+            .doc('current_week')
             .get();
 
         if (goalsDoc.exists) {
           _currentGoals = goalsDoc.data()!;
           _stepGoalController.text =
               (_currentGoals['stepGoal'] ?? 0).toString();
-          _workoutGoalController.text =
-              (_currentGoals['workoutGoal'] ?? 0).toString();
-          _selectedBodyPart = _currentGoals['focusBodyPart'] ?? 'Full Body';
+
+          // Load weekly schedule if it exists
+          if (_currentGoals['weeklySchedule'] != null) {
+            Map<String, dynamic> savedSchedule =
+                _currentGoals['weeklySchedule'];
+            for (String dayKey in savedSchedule.keys) {
+              if (_weeklySchedule.containsKey(dayKey)) {
+                _weeklySchedule[dayKey] =
+                    Map<String, dynamic>.from(savedSchedule[dayKey]);
+              }
+            }
+          }
         }
 
         // Load weekly progress
@@ -90,13 +146,13 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        final weekStart = _getWeekStart();
-        final weekEnd = _getWeekEnd();
+        final weekStart = _formatDate(_weekStart);
+        final weekEnd = _formatDate(_weekEnd);
 
         // Get completed workouts for the week
         final workoutsSnapshot = await _firestore
             .collection('users')
-            .doc(user.uid)
+            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
             .collection('workout_history')
             .where('completedAt', isGreaterThanOrEqualTo: weekStart)
             .where('completedAt', isLessThanOrEqualTo: weekEnd)
@@ -105,10 +161,10 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         int completedWorkouts = workoutsSnapshot.docs.length;
         int totalSteps = 0;
 
-        // Get step count for the week (from profile or activity tracking)
+        // Get step count for the week
         final profileSnapshot = await _firestore
             .collection('users')
-            .doc(user.uid)
+            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
             .collection('profile')
             .limit(1)
             .get();
@@ -123,25 +179,12 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             'completedWorkouts': completedWorkouts,
             'totalSteps': totalSteps,
             'stepGoal': _currentGoals['stepGoal'] ?? 0,
-            'workoutGoal': _currentGoals['workoutGoal'] ?? 0,
           };
         });
       }
     } catch (e) {
       print('Error loading progress: $e');
     }
-  }
-
-  String _getWeekStart() {
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    return '${weekStart.year}-${weekStart.month.toString().padLeft(2, '0')}-${weekStart.day.toString().padLeft(2, '0')}';
-  }
-
-  String _getWeekEnd() {
-    final now = DateTime.now();
-    final weekEnd = now.add(Duration(days: 7 - now.weekday));
-    return '${weekEnd.year}-${weekEnd.month.toString().padLeft(2, '0')}-${weekEnd.day.toString().padLeft(2, '0')}';
   }
 
   Future<void> _saveGoals() async {
@@ -153,28 +196,36 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       }
 
       final stepGoal = int.tryParse(_stepGoalController.text) ?? 0;
-      final workoutGoal = int.tryParse(_workoutGoalController.text) ?? 0;
 
-      if (stepGoal <= 0 || workoutGoal <= 0) {
+      if (stepGoal <= 0) {
         _showSnackBar('Please enter valid goals', Colors.red);
         return;
       }
 
-      final weekStart = _getWeekStart();
+      // Check if at least one workout day is scheduled
+      int scheduledWorkouts = _weeklySchedule.values
+          .where((day) => day['isWorkoutDay'] == true)
+          .length;
+
+      if (scheduledWorkouts == 0) {
+        _showSnackBar('Please schedule at least one workout day', Colors.red);
+        return;
+      }
+
       final goalsData = {
         'stepGoal': stepGoal,
-        'workoutGoal': workoutGoal,
-        'focusBodyPart': _selectedBodyPart,
+        'weeklySchedule': _weeklySchedule,
+        'weekStart': _formatDate(_weekStart),
+        'weekEnd': _formatDate(_weekEnd),
         'createdAt': FieldValue.serverTimestamp(),
-        'weekStart': weekStart,
-        'weekEnd': _getWeekEnd(),
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
       await _firestore
           .collection('users')
-          .doc(user.uid)
-          .collection('weekly_goals')
-          .doc(weekStart)
+          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .collection('Weekly_Goals')
+          .doc('current_week')
           .set(goalsData);
 
       setState(() {
@@ -257,6 +308,10 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Week Overview Card
+          _buildWeekOverviewCard(),
+          SizedBox(height: 24),
+
           // Progress Overview Card
           _buildProgressOverviewCard(),
           SizedBox(height: 24),
@@ -265,8 +320,8 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
           _buildGoalSettingSection(),
           SizedBox(height: 24),
 
-          // Body Part Focus Section
-          _buildBodyPartFocusSection(),
+          // Weekly Schedule Section
+          _buildWeeklyScheduleSection(),
           SizedBox(height: 24),
 
           // Save Button
@@ -276,17 +331,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     );
   }
 
-  Widget _buildProgressOverviewCard() {
-    final stepProgress = _weeklyProgress['stepGoal'] > 0
-        ? (_weeklyProgress['totalSteps'] / _weeklyProgress['stepGoal'])
-            .clamp(0.0, 1.0)
-        : 0.0;
-    final workoutProgress = _weeklyProgress['workoutGoal'] > 0
-        ? (_weeklyProgress['completedWorkouts'] /
-                _weeklyProgress['workoutGoal'])
-            .clamp(0.0, 1.0)
-        : 0.0;
-
+  Widget _buildWeekOverviewCard() {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -311,11 +356,72 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'This Week\'s Progress',
+            'This Week\'s Schedule',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            '${_formatDate(_weekStart)} - ${_formatDate(_weekEnd)}',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.9),
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                '${_weeklySchedule.values.where((day) => day['isWorkoutDay'] == true).length} workout days scheduled',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressOverviewCard() {
+    final stepProgress = _weeklyProgress['stepGoal'] > 0
+        ? (_weeklyProgress['totalSteps'] / _weeklyProgress['stepGoal'])
+            .clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Progress Overview',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
               fontFamily: 'Poppins',
             ),
           ),
@@ -329,16 +435,6 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             stepProgress,
             Icons.directions_walk,
           ),
-          SizedBox(height: 16),
-
-          // Workouts Progress
-          _buildProgressItem(
-            'Workouts',
-            _weeklyProgress['completedWorkouts'] ?? 0,
-            _weeklyProgress['workoutGoal'] ?? 0,
-            workoutProgress,
-            Icons.fitness_center,
-          ),
         ],
       ),
     );
@@ -351,12 +447,12 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       children: [
         Row(
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            Icon(icon, color: Color(0xFF6e9277), size: 20),
             SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.grey[800],
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Poppins',
@@ -366,7 +462,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             Text(
               '$current / $goal',
               style: TextStyle(
-                color: Colors.white,
+                color: Colors.grey[600],
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Poppins',
@@ -377,15 +473,15 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         SizedBox(height: 8),
         LinearProgressIndicator(
           value: progress,
-          backgroundColor: Colors.white.withOpacity(0.3),
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          backgroundColor: Colors.grey[300],
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
           minHeight: 8,
         ),
         SizedBox(height: 4),
         Text(
           '${(progress * 100).toInt()}% Complete',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
+            color: Colors.grey[600],
             fontSize: 12,
             fontFamily: 'Poppins',
           ),
@@ -435,27 +531,12 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
               prefixIcon: Icon(Icons.directions_walk, color: Color(0xFF6e9277)),
             ),
           ),
-          SizedBox(height: 16),
-
-          // Workout Goal
-          TextField(
-            controller: _workoutGoalController,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: 'Weekly Workout Goal',
-              hintText: 'e.g., 4',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: Icon(Icons.fitness_center, color: Color(0xFF6e9277)),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildBodyPartFocusSection() {
+  Widget _buildWeeklyScheduleSection() {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -473,7 +554,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Focus Body Part',
+            'Weekly Workout Schedule',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -481,30 +562,215 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
               fontFamily: 'Poppins',
             ),
           ),
-          SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedBodyPart,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              prefixIcon: Icon(Icons.fitness_center, color: Color(0xFF6e9277)),
+          SizedBox(height: 8),
+          Text(
+            'Schedule your workouts for the week:',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              fontFamily: 'Poppins',
             ),
-            items: _bodyParts.map((bodyPart) {
-              return DropdownMenuItem(
-                value: bodyPart,
-                child: Text(bodyPart),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedBodyPart = value!;
-              });
-            },
           ),
+          SizedBox(height: 16),
+
+          // Weekly schedule cards
+          ...(_weeklySchedule.entries
+              .map((entry) => _buildDayScheduleCard(entry.key, entry.value))),
         ],
       ),
     );
+  }
+
+  Widget _buildDayScheduleCard(String dayKey, Map<String, dynamic> dayData) {
+    bool isWorkoutDay = dayData['isWorkoutDay'] ?? false;
+    String dayName = dayData['dayName'] ?? '';
+    String date = dayData['date'] ?? '';
+    List<String> bodyParts = List<String>.from(dayData['bodyParts'] ?? []);
+    String workoutTime = dayData['workoutTime'] ?? '09:00';
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isWorkoutDay ? Color(0xFF6e9277) : Colors.grey[300]!,
+          width: isWorkoutDay ? 2 : 1,
+        ),
+      ),
+      child: ExpansionTile(
+        title: Row(
+          children: [
+            Checkbox(
+              value: isWorkoutDay,
+              onChanged: (bool? value) {
+                setState(() {
+                  _weeklySchedule[dayKey]!['isWorkoutDay'] = value ?? false;
+                  if (!(value ?? false)) {
+                    _weeklySchedule[dayKey]!['bodyParts'] = [];
+                  }
+                });
+              },
+              activeColor: Color(0xFF6e9277),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dayName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color:
+                          isWorkoutDay ? Color(0xFF6e9277) : Colors.grey[800],
+                    ),
+                  ),
+                  Text(
+                    date,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isWorkoutDay)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Color(0xFF6e9277),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${bodyParts.length} parts',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        children: isWorkoutDay
+            ? [
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Workout Time
+                      Text(
+                        'Workout Time',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      InkWell(
+                        onTap: () => _selectTime(context, dayKey),
+                        child: Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time,
+                                  color: Color(0xFF6e9277), size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                workoutTime,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'Poppins',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+
+                      // Body Parts Selection
+                      Text(
+                        'Focus Body Parts',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _availableBodyParts.map((bodyPart) {
+                          bool isSelected = bodyParts.contains(bodyPart);
+                          return FilterChip(
+                            label: Text(
+                              bodyPart,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Poppins',
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.grey[800],
+                              ),
+                            ),
+                            selected: isSelected,
+                            onSelected: (bool selected) {
+                              setState(() {
+                                if (selected) {
+                                  bodyParts.add(bodyPart);
+                                } else {
+                                  bodyParts.remove(bodyPart);
+                                }
+                                _weeklySchedule[dayKey]!['bodyParts'] =
+                                    bodyParts;
+                              });
+                            },
+                            backgroundColor: Colors.grey[200],
+                            selectedColor: Color(0xFF6e9277),
+                            checkmarkColor: Colors.white,
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ]
+            : [],
+      ),
+    );
+  }
+
+  Future<void> _selectTime(BuildContext context, String dayKey) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(
+        DateTime.parse(
+            '2024-01-01 ${_weeklySchedule[dayKey]!['workoutTime']}:00'),
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _weeklySchedule[dayKey]!['workoutTime'] =
+            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      });
+    }
   }
 
   Widget _buildSaveButton() {
