@@ -39,50 +39,19 @@ class _HomePageState extends State<HomePage> {
       _initHealthConnect();
     });
     _widgetOptions = <Widget>[
-      Text('Home Screen'), // Replace with your Home widget
-      Text('Search Screen'), // Replace with your Search widget
-      Text('Back Screen'), // Replace with your Back widget
-      Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.logout, size: 100, color: Colors.white),
-            SizedBox(height: 20),
-            Text(
-              'Are you sure you want to logout?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontFamily: 'DM Sans',
-              ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                // Navigate to login page and clear navigation stack
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => LoginPage()),
-                  (route) => false,
-                );
-              },
-              child: Text(
-                'Logout',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontFamily: 'DM Sans',
-                  fontSize: 20,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF6e9277),
-                padding: EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-              ),
-            ),
-          ],
-        ),
-      ),
+      // Home Screen - Current page content
+      _buildHomeContent(),
+      // Weekly Goals Screen
+      WeeklyGoalsPage(),
+      // Saved Workouts Screen
+      SavedWorkoutPage(),
+      // Profile Screen
+      ProfilePage(),
     ];
+  }
+
+  Widget _buildHomeContent() {
+    return Container(); // This will be replaced with the actual home content
   }
 
   // Add method to load initial steps from Firebase
@@ -148,6 +117,24 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index; // Update the selected index
     });
+    
+    // Navigate to different pages based on index
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => WeeklyGoalsPage()),
+      );
+    } else if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SavedWorkoutPage()),
+      );
+    } else if (index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => ProfilePage()),
+      );
+    }
   }
 
   @override
@@ -646,8 +633,9 @@ class _HomePageState extends State<HomePage> {
                                           Navigator.pop(context);
 
                                           // Extract the workoutPlan from the response
-                                          final workoutPlan = workoutData['workoutPlan'];
-                                          
+                                          final workoutPlan =
+                                              workoutData['workoutPlan'];
+
                                           // Navigate to workout page with generated data
                                           Navigator.push(
                                             context,
@@ -948,9 +936,9 @@ class _HomePageState extends State<HomePage> {
             tabBackgroundColor: Color(0xFF6e9277),
             tabs: [
               GButton(icon: Icons.home, text: 'Home'),
-              GButton(icon: Icons.search, text: 'Search'),
-              GButton(icon: Icons.arrow_back, text: 'Back'),
-              GButton(icon: Icons.logout, text: 'Logout'),
+              GButton(icon: Icons.calendar_today, text: 'Goals'),
+              GButton(icon: Icons.favorite, text: 'Saved'),
+              GButton(icon: Icons.person, text: 'Profile'),
             ],
             selectedIndex: _selectedIndex,
             onTabChange: (index) {
