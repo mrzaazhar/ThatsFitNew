@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'services/notification_service.dart';
 
 class WeeklyGoalsPage extends StatefulWidget {
   @override
@@ -39,6 +40,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     super.initState();
     _initializeWeekSchedule();
     _loadCurrentGoals();
+    _requestNotificationPermissions();
   }
 
   @override
@@ -232,6 +234,17 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         _currentGoals = goalsData;
       });
 
+      // Schedule workout notifications
+      try {
+        await NotificationService.scheduleWeeklyWorkoutNotifications(
+          weeklySchedule: _weeklySchedule,
+        );
+        print('Workout notifications scheduled successfully');
+      } catch (e) {
+        print('Error scheduling workout notifications: $e');
+        // Don't show error to user as this is not critical
+      }
+
       _showSnackBar('Weekly goals saved successfully! 🎯', Colors.green);
       await _loadWeeklyProgress();
     } catch (e) {
@@ -260,23 +273,38 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     );
   }
 
+  Future<void> _requestNotificationPermissions() async {
+    try {
+      final granted = await NotificationService.requestPermissions();
+      if (granted) {
+        print('Notification permissions granted');
+      } else {
+        print('Notification permissions denied');
+      }
+    } catch (e) {
+      print('Error requesting notification permissions: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFf8f9fa),
-      appBar: AppBar(
-        title: Text(
-          'Weekly Goals',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
+      backgroundColor: Color(0xFF1a1a1a),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
+            ],
           ),
         ),
-        backgroundColor: Color(0xFF6e9277),
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
+        child: SafeArea(
+          child: _isLoading ? _buildLoadingState() : _buildMainContent(),
+        ),
       ),
-      body: _isLoading ? _buildLoadingState() : _buildMainContent(),
     );
   }
 
@@ -286,14 +314,14 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
           ),
           SizedBox(height: 20),
           Text(
             'Loading your goals...',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -303,31 +331,74 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
   }
 
   Widget _buildMainContent() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Week Overview Card
-          _buildWeekOverviewCard(),
-          SizedBox(height: 24),
+    return Column(
+      children: [
+        // Custom App Bar
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: 22,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Weekly Goals',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Spacer(),
+            ],
+          ),
+        ),
 
-          // Progress Overview Card
-          _buildProgressOverviewCard(),
-          SizedBox(height: 24),
+        // Main Content
+        Expanded(
+          child: SingleChildScrollView(
+            physics: BouncingScrollPhysics(),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Week Overview Card
+                  _buildWeekOverviewCard(),
+                  SizedBox(height: 24),
 
-          // Goal Setting Section
-          _buildGoalSettingSection(),
-          SizedBox(height: 24),
+                  // Progress Overview Card
+                  _buildProgressOverviewCard(),
+                  SizedBox(height: 24),
 
-          // Weekly Schedule Section
-          _buildWeeklyScheduleSection(),
-          SizedBox(height: 24),
+                  // Goal Setting Section
+                  _buildGoalSettingSection(),
+                  SizedBox(height: 24),
 
-          // Save Button
-          _buildSaveButton(),
-        ],
-      ),
+                  // Notification Settings Section
+                  _buildNotificationSettingsSection(),
+                  SizedBox(height: 24),
+
+                  // Weekly Schedule Section
+                  _buildWeeklyScheduleSection(),
+                  SizedBox(height: 24),
+
+                  // Save Button
+                  _buildSaveButton(),
+                  SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -339,14 +410,14 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF6e9277),
-            Color(0xFF5a7a63),
+            Color(0xFF33443c),
+            Color(0xFF2a3630),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 10,
             offset: Offset(0, 4),
           ),
@@ -403,11 +474,11 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF2d2d2d),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: Offset(0, 2),
           ),
@@ -421,7 +492,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -447,12 +518,12 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       children: [
         Row(
           children: [
-            Icon(icon, color: Color(0xFF6e9277), size: 20),
+            Icon(icon, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: Colors.grey[800],
+                color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Poppins',
@@ -462,7 +533,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             Text(
               '$current / $goal',
               style: TextStyle(
-                color: Colors.grey[600],
+                color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Poppins',
@@ -473,15 +544,15 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         SizedBox(height: 8),
         LinearProgressIndicator(
           value: progress,
-          backgroundColor: Colors.grey[300],
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+          backgroundColor: Colors.grey[700],
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
           minHeight: 8,
         ),
         SizedBox(height: 4),
         Text(
           '${(progress * 100).toInt()}% Complete',
           style: TextStyle(
-            color: Colors.grey[600],
+            color: Colors.white,
             fontSize: 12,
             fontFamily: 'Poppins',
           ),
@@ -494,11 +565,11 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF2d2d2d),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: Offset(0, 2),
           ),
@@ -512,7 +583,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -522,13 +593,27 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
           TextField(
             controller: _stepGoalController,
             keyboardType: TextInputType.number,
+            style: TextStyle(color: Colors.white),
             decoration: InputDecoration(
               labelText: 'Weekly Step Goal',
+              labelStyle: TextStyle(color: Colors.white),
               hintText: 'e.g., 50000',
+              hintStyle: TextStyle(color: Colors.grey[300]),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[400]!),
               ),
-              prefixIcon: Icon(Icons.directions_walk, color: Color(0xFF6e9277)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[400]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Color(0xFF33443c)),
+              ),
+              filled: true,
+              fillColor: Color(0xFF1a1a1a),
+              prefixIcon: Icon(Icons.directions_walk, color: Color(0xFF33443c)),
             ),
           ),
         ],
@@ -536,15 +621,137 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
     );
   }
 
+  Widget _buildNotificationSettingsSection() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Color(0xFF2d2d2d),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.notifications, color: Colors.white, size: 24),
+              SizedBox(width: 12),
+              Text(
+                'Notification Settings',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Get reminded about your scheduled workouts:',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 12),
+          _buildNotificationItem(
+            '1 hour before workout',
+            'Early preparation reminder',
+            Icons.access_time,
+          ),
+          SizedBox(height: 8),
+          _buildNotificationItem(
+            '30 minutes before workout',
+            'Get ready reminder',
+            Icons.timer,
+          ),
+          SizedBox(height: 8),
+          _buildNotificationItem(
+            'At workout time',
+            'Start your workout now!',
+            Icons.fitness_center,
+          ),
+          SizedBox(height: 16),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Color(0xFF33443c).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Color(0xFF33443c).withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF33443c), size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Notifications will be automatically scheduled when you save your weekly goals.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF33443c),
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem(String title, String subtitle, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: Color(0xFF33443c), size: 20),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[400],
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildWeeklyScheduleSection() {
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF2d2d2d),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: Offset(0, 2),
           ),
@@ -558,7 +765,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -567,7 +774,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             'Schedule your workouts for the week:',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -590,10 +797,11 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
 
     return Card(
       margin: EdgeInsets.only(bottom: 12),
+      color: Color(0xFF1a1a1a),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isWorkoutDay ? Color(0xFF6e9277) : Colors.grey[300]!,
+          color: isWorkoutDay ? Color(0xFF33443c) : Colors.grey[700]!,
           width: isWorkoutDay ? 2 : 1,
         ),
       ),
@@ -610,7 +818,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                   }
                 });
               },
-              activeColor: Color(0xFF6e9277),
+              activeColor: Color(0xFF33443c),
             ),
             Expanded(
               child: Column(
@@ -622,15 +830,14 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       fontFamily: 'Poppins',
-                      color:
-                          isWorkoutDay ? Color(0xFF6e9277) : Colors.grey[800],
+                      color: isWorkoutDay ? Color(0xFF33443c) : Colors.white,
                     ),
                   ),
                   Text(
                     date,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: Colors.white,
                       fontFamily: 'Poppins',
                     ),
                   ),
@@ -641,7 +848,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Color(0xFF6e9277),
+                  color: Color(0xFF33443c),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -670,7 +877,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Poppins',
-                          color: Colors.grey[800],
+                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 8),
@@ -680,20 +887,22 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                           padding:
                               EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
+                            border: Border.all(color: Colors.grey[400]!),
                             borderRadius: BorderRadius.circular(8),
+                            color: Color(0xFF1a1a1a),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.access_time,
-                                  color: Color(0xFF6e9277), size: 20),
+                                  color: Colors.white, size: 20),
                               SizedBox(width: 8),
                               Text(
                                 workoutTime,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontFamily: 'Poppins',
+                                  color: Colors.white,
                                 ),
                               ),
                             ],
@@ -709,7 +918,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           fontFamily: 'Poppins',
-                          color: Colors.grey[800],
+                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 8),
@@ -726,7 +935,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                                 fontFamily: 'Poppins',
                                 color: isSelected
                                     ? Colors.white
-                                    : Colors.grey[800],
+                                    : Colors.grey[300],
                               ),
                             ),
                             selected: isSelected,
@@ -741,8 +950,8 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
                                     bodyParts;
                               });
                             },
-                            backgroundColor: Colors.grey[200],
-                            selectedColor: Color(0xFF6e9277),
+                            backgroundColor: Color(0xFF3d3d3d),
+                            selectedColor: Color(0xFF33443c),
                             checkmarkColor: Colors.white,
                           );
                         }).toList(),
@@ -779,7 +988,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
       child: ElevatedButton(
         onPressed: _saveGoals,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color(0xFF6e9277),
+          backgroundColor: Color(0xFF33443c),
           foregroundColor: Colors.white,
           padding: EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(

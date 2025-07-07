@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'services/health_connect_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'services/workout_service.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -474,128 +475,383 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                       SizedBox(height: 22),
-                      // Create Workout Card
-                      Card(
-                        color: Colors.white,
-                        elevation: 7,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                      // Generate Workout Card
+                      Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          maxWidth: 500,
+                          minHeight: 160,
                         ),
-                        child: Container(
-                          width: double.infinity,
-                          constraints: BoxConstraints(
-                            maxWidth: 500,
-                            minHeight: 180,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            image: DecorationImage(
-                              image: AssetImage('assets/JPG/Gym.jpg'),
-                              fit: BoxFit.cover,
-                              colorFilter: ColorFilter.mode(
-                                Colors.black.withOpacity(0.18),
-                                BlendMode.darken,
-                              ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 20,
+                              offset: Offset(0, 10),
                             ),
-                          ),
-                          child: Container(
-                            padding: EdgeInsets.all(24),
-                            alignment: Alignment.bottomCenter,
-                            child: CreateWorkoutButton(
-                              userId: userId ?? '',
-                              onWorkoutCreated: (result) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WorkoutPage(
-                                      suggestedWorkout: result['workoutPlan'],
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            // Background Image
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    image: DecorationImage(
+                                      image: AssetImage('assets/JPG/Gym.jpg'),
+                                      fit: BoxFit.cover,
+                                      colorFilter: ColorFilter.mode(
+                                        Colors.black.withOpacity(0.3),
+                                        BlendMode.darken,
+                                      ),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 18),
-                      // Set Weekly Goals Card
-                      Card(
-                        color: Colors.white,
-                        elevation: 7,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Container(
-                          width: double.infinity,
-                          constraints: BoxConstraints(
-                            maxWidth: 500,
-                            minHeight: 180,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            image: DecorationImage(
-                              image: AssetImage('assets/JPG/workout_image.jpg'),
-                              fit: BoxFit.cover,
-                              colorFilter: ColorFilter.mode(
-                                Colors.black.withOpacity(0.18),
-                                BlendMode.darken,
+                                ),
                               ),
                             ),
-                          ),
-                          child: Container(
-                            padding: EdgeInsets.all(24),
-                            alignment: Alignment.bottomCenter,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => WeeklyGoalsPage(),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Color.fromARGB(255, 124, 49, 164),
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 4,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                            // Content
+                            Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Row(
                                 children: [
-                                  Icon(
-                                    Icons.flag,
-                                    size: 24,
-                                    color: Colors.white,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Set Your Weekly Goals',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Poppins',
-                                      color: Colors.white,
+                                  // Left side - Text content
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Generate',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            fontFamily: 'Poppins',
+                                            letterSpacing: -0.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Workout',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            fontFamily: 'Poppins',
+                                            letterSpacing: -0.5,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'AI-powered plans',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color:
+                                                Colors.white.withOpacity(0.9),
+                                            fontFamily: 'Inter',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    textAlign: TextAlign.center,
+                                  ),
+                                  // Right side - Modern Button
+                                  Container(
+                                    width: 120,
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        // Show a modern loading dialog
+                                        showDialog(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (BuildContext context) {
+                                            return Dialog(
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              child: Container(
+                                                padding: EdgeInsets.all(24),
+                                                decoration: BoxDecoration(
+                                                  color: Color(0xFF1a1a1a),
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                  border: Border.all(
+                                                    color: Colors.white
+                                                        .withOpacity(0.1),
+                                                  ),
+                                                ),
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    CircularProgressIndicator(
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                              Color>(
+                                                        Color(0xFF6e9277),
+                                                      ),
+                                                    ),
+                                                    SizedBox(height: 16),
+                                                    Text(
+                                                      'Generating your workout...',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 16,
+                                                        fontFamily: 'Poppins',
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        );
+
+                                        try {
+                                          // Get current user
+                                          final user =
+                                              FirebaseAuth.instance.currentUser;
+                                          if (user == null) {
+                                            Navigator.pop(
+                                                context); // Close loading dialog
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Please log in to generate workouts'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                            return;
+                                          }
+
+                                          // Create workout service instance
+                                          final workoutService =
+                                              WorkoutService();
+
+                                          // Call backend to generate workout
+                                          final workoutData =
+                                              await workoutService
+                                                  .createWorkout(
+                                            userId: user.uid,
+                                          );
+
+                                          // Close loading dialog
+                                          Navigator.pop(context);
+
+                                          // Extract the workoutPlan from the response
+                                          final workoutPlan = workoutData['workoutPlan'];
+                                          
+                                          // Navigate to workout page with generated data
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => WorkoutPage(
+                                                suggestedWorkout: workoutPlan,
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          // Close loading dialog
+                                          Navigator.pop(context);
+
+                                          // Show error message
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Failed to generate workout: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Start',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              fontFamily: 'Poppins',
+                                            ),
+                                          ),
+                                          SizedBox(width: 6),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 18,
+                                            color: Colors.black,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 18),
+                      // Set Weekly Goals Card
+                      Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(
+                          maxWidth: 500,
+                          minHeight: 160,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 20,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            // Background Image
+                            Positioned.fill(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    image: DecorationImage(
+                                      image: AssetImage(
+                                          'assets/JPG/workout_image.jpg'),
+                                      fit: BoxFit.cover,
+                                      colorFilter: ColorFilter.mode(
+                                        Colors.black.withOpacity(0.3),
+                                        BlendMode.darken,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Content
+                            Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Row(
+                                children: [
+                                  // Left side - Text content
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Set Your',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            fontFamily: 'Poppins',
+                                            letterSpacing: -0.5,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Weekly Goals',
+                                          style: TextStyle(
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            fontFamily: 'Poppins',
+                                            letterSpacing: -0.5,
+                                          ),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Plan your workout schedule',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color:
+                                                Colors.white.withOpacity(0.9),
+                                            fontFamily: 'Inter',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Right side - Modern Button
+                                  Container(
+                                    width: 120,
+                                    height: 50,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                WeeklyGoalsPage(),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Plan',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                              fontFamily: 'Poppins',
+                                            ),
+                                          ),
+                                          SizedBox(width: 6),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 18,
+                                            color: Colors.black,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       SizedBox(height: 18),
                       // Saved Workouts Card
                       Card(
-                        color: Color.fromARGB(133, 165, 72, 198),
+                        color: Color(0xFF33443c),
                         elevation: 7,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),

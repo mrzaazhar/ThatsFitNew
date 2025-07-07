@@ -99,6 +99,180 @@ class NotificationService {
     );
   }
 
+  /// Schedule workout notifications for a specific day and time
+  static Future<void> scheduleWorkoutNotifications({
+    required String dayKey, // Format: YYYY-MM-DD
+    required String workoutTime, // Format: HH:MM
+    required List<String> bodyParts,
+    required int baseNotificationId, // Base ID for this workout day
+  }) async {
+    await initialize();
+
+    // Parse the workout time
+    final timeParts = workoutTime.split(':');
+    if (timeParts.length != 2) {
+      print('Invalid workout time format: $workoutTime');
+      return;
+    }
+
+    final hour = int.tryParse(timeParts[0]);
+    final minute = int.tryParse(timeParts[1]);
+    
+    if (hour == null || minute == null) {
+      print('Invalid workout time: $workoutTime');
+      return;
+    }
+
+    // Parse the day
+    final dayParts = dayKey.split('-');
+    if (dayParts.length != 3) {
+      print('Invalid day format: $dayKey');
+      return;
+    }
+
+    final year = int.tryParse(dayParts[0]);
+    final month = int.tryParse(dayParts[1]);
+    final day = int.tryParse(dayParts[2]);
+
+    if (year == null || month == null || day == null) {
+      print('Invalid day format: $dayKey');
+      return;
+    }
+
+    // Create the workout date
+    final workoutDate = DateTime(year, month, day, hour, minute);
+    
+    // Check if the workout time has already passed for today
+    final now = DateTime.now();
+    if (workoutDate.isBefore(now)) {
+      print('Workout time has already passed for $dayKey at $workoutTime');
+      return;
+    }
+
+    // Create notification messages
+    final bodyPartsText = bodyParts.join(' & ');
+    
+    // 1. 1 hour before notification
+    final oneHourBefore = workoutDate.subtract(Duration(hours: 1));
+    if (oneHourBefore.isAfter(now)) {
+      await _notifications.zonedSchedule(
+        baseNotificationId,
+        'Workout Reminder - 1 Hour',
+        'Your $bodyPartsText workout starts in 1 hour! Time to prepare.',
+        tz.TZDateTime.from(oneHourBefore, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'workout_reminder',
+            'Workout Reminders',
+            channelDescription: 'Reminders for scheduled workouts',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      print('Scheduled 1-hour reminder for $dayKey at ${oneHourBefore.toString()}');
+    }
+
+    // 2. 30 minutes before notification
+    final thirtyMinutesBefore = workoutDate.subtract(Duration(minutes: 30));
+    if (thirtyMinutesBefore.isAfter(now)) {
+      await _notifications.zonedSchedule(
+        baseNotificationId + 1,
+        'Workout Reminder - 30 Minutes',
+        'Your $bodyPartsText workout starts in 30 minutes! Get ready to crush it!',
+        tz.TZDateTime.from(thirtyMinutesBefore, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'workout_reminder',
+            'Workout Reminders',
+            channelDescription: 'Reminders for scheduled workouts',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+      print('Scheduled 30-minute reminder for $dayKey at ${thirtyMinutesBefore.toString()}');
+    }
+
+    // 3. At the scheduled time notification
+    await _notifications.zonedSchedule(
+      baseNotificationId + 2,
+      'Time for Your Workout! 💪',
+      'Your $bodyPartsText workout is starting now! Let\'s get moving!',
+      tz.TZDateTime.from(workoutDate, tz.local),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'workout_reminder',
+          'Workout Reminders',
+          channelDescription: 'Reminders for scheduled workouts',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    );
+    print('Scheduled workout time notification for $dayKey at ${workoutDate.toString()}');
+  }
+
+  /// Schedule all workout notifications for the week
+  static Future<void> scheduleWeeklyWorkoutNotifications({
+    required Map<String, dynamic> weeklySchedule,
+  }) async {
+    await initialize();
+
+    // Cancel existing workout notifications (IDs 1000-9999 are reserved for workout notifications)
+    await _notifications.cancelAll();
+
+    int notificationId = 1000; // Start with ID 1000 for workout notifications
+
+    for (String dayKey in weeklySchedule.keys) {
+      final dayData = weeklySchedule[dayKey];
+      
+      if (dayData is Map<String, dynamic> && 
+          dayData['isWorkoutDay'] == true && 
+          dayData['bodyParts'] != null && 
+          dayData['bodyParts'].length > 0) {
+        
+        final bodyParts = List<String>.from(dayData['bodyParts']);
+        final workoutTime = dayData['workoutTime'] ?? '09:00';
+
+        await scheduleWorkoutNotifications(
+          dayKey: dayKey,
+          workoutTime: workoutTime,
+          bodyParts: bodyParts,
+          baseNotificationId: notificationId,
+        );
+
+        notificationId += 10; // Increment by 10 to leave space for 3 notifications per workout
+      }
+    }
+
+    print('Scheduled workout notifications for the week');
+  }
+
+  /// Cancel workout notifications for a specific day
+  static Future<void> cancelWorkoutNotificationsForDay(String dayKey) async {
+    // Calculate the base notification ID for this day
+    // This is a simple hash-based approach - in a real app, you might want to store the IDs
+    final dayHash = dayKey.hashCode;
+    final baseId = 1000 + (dayHash % 1000);
+    
+    // Cancel the 3 notifications for this day
+    await _notifications.cancel(baseId);
+    await _notifications.cancel(baseId + 1);
+    await _notifications.cancel(baseId + 2);
+    
+    print('Cancelled workout notifications for $dayKey');
+  }
+
   /// Cancel specific notification
   static Future<void> cancelNotification(int id) async {
     await _notifications.cancel(id);

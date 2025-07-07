@@ -66,27 +66,47 @@ class _WorkoutPageState extends State<WorkoutPage>
 
     if (widget.suggestedWorkout == null) {
       return Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: Colors.black,
         appBar: AppBar(
-          title: Text('Workout Plan'),
-          backgroundColor: Color(0xFF6e9277),
+          title: Text(
+            'Workout Plan',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: Colors.black,
           elevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.fitness_center, size: 80, color: Colors.grey[400]),
-              SizedBox(height: 16),
-              Text(
-                'No workout data available',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey[600],
-                  fontFamily: 'Poppins',
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF1A1A1A),
+                Color(0xFF000000),
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.fitness_center, size: 80, color: Colors.grey[400]),
+                SizedBox(height: 16),
+                Text(
+                  'No workout data available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -105,175 +125,201 @@ class _WorkoutPageState extends State<WorkoutPage>
     final workoutOptions = widget.suggestedWorkout!['workoutOptions'] ?? [];
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          'Your Workout Options',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
+      backgroundColor: Colors.black,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
+            ],
           ),
         ),
-        backgroundColor: Color(0xFF6e9277),
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
-        bottom: workoutOptions.length > 1
-            ? TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.white,
-                indicatorWeight: 3,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white.withOpacity(0.7),
-                labelStyle: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  fontSize:
-                      _getFontSize(context, small: 14, medium: 16, large: 18),
-                ),
-                tabs: workoutOptions.map<Widget>((workout) {
-                  return Tab(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(workout['name'] ?? 'Workout'),
-                        SizedBox(height: 4),
-                        Text(
-                          '${workout['exercises']?.length ?? 0} exercises',
-                          style: TextStyle(
-                            fontSize: _getFontSize(context,
-                                small: 10, medium: 12, large: 14),
-                            fontWeight: FontWeight.normal,
-                          ),
-                        ),
-                      ],
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Custom App Bar
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  );
-                }).toList(),
-              )
-            : null,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Compact Workout Summary Card
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(_getCardPadding(context)),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF6e9277),
-                    Color(0xFF5a7a63),
+                    SizedBox(width: 10),
+                    Text(
+                      'Your Workout Options',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    Spacer(),
                   ],
                 ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft:
-                      Radius.circular(_isSmallScreen(context) ? 20 : 30),
-                  bottomRight:
-                      Radius.circular(_isSmallScreen(context) ? 20 : 30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: Offset(0, 5),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
+              // Tab Bar
+              if (workoutOptions.length > 1)
+                Container(
+                  color: Colors.black,
+                  child: TabBar(
+                    controller: _tabController,
+                    indicatorColor: Color(0xFF6e9277),
+                    indicatorWeight: 3,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white.withOpacity(0.7),
+                    labelStyle: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      fontSize: _getFontSize(context,
+                          small: 14, medium: 16, large: 18),
+                    ),
+                    tabs: workoutOptions.map<Widget>((workout) {
+                      return Tab(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              summary['title'] ?? 'Workout Options',
-                              style: TextStyle(
-                                fontSize: _getFontSize(context,
-                                    small: 20, medium: 24, large: 28),
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                fontFamily: 'Poppins',
-                              ),
-                            ),
+                            Text(workout['name'] ?? 'Workout'),
                             SizedBox(height: 4),
                             Text(
-                              summary['subtitle'] ?? 'Choose Your Workout',
+                              '${workout['exercises']?.length ?? 0} exercises',
                               style: TextStyle(
                                 fontSize: _getFontSize(context,
-                                    small: 14, medium: 16, large: 18),
-                                color: Colors.white.withOpacity(0.9),
-                                fontFamily: 'Poppins',
+                                    small: 10, medium: 12, large: 14),
+                                fontWeight: FontWeight.normal,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.swipe_up,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
-                  SizedBox(height: 16),
-
-                  // Compact summary items in a single row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                ),
+              // Main Content
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: BouncingScrollPhysics(),
+                  child: Column(
                     children: [
-                      _buildCompactSummaryItem(
-                        Icons.fitness_center,
-                        'Intensity',
-                        summary['intensity'] ?? 'N/A',
-                        context,
+                      // Compact Workout Summary Card
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(_getCardPadding(context)),
+                        margin: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(24),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        summary['title'] ?? 'Workout Options',
+                                        style: TextStyle(
+                                          fontSize: _getFontSize(context,
+                                              small: 20, medium: 24, large: 28),
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        summary['subtitle'] ??
+                                            'Choose Your Workout',
+                                        style: TextStyle(
+                                          fontSize: _getFontSize(context,
+                                              small: 14, medium: 16, large: 18),
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontFamily: 'Poppins',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Color(0xFF6e9277).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.swipe_up,
+                                    color: Color(0xFF6e9277),
+                                    size: 24,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+
+                            // Compact summary items in a single row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildCompactSummaryItem(
+                                  Icons.fitness_center,
+                                  'Intensity',
+                                  summary['intensity'] ?? 'N/A',
+                                  context,
+                                ),
+                                _buildCompactSummaryItem(
+                                  Icons.directions_walk,
+                                  'Steps',
+                                  (summary['stepCount'] ?? 'N/A').toString(),
+                                  context,
+                                ),
+                                _buildCompactSummaryItem(
+                                  Icons.timer,
+                                  'Rest',
+                                  summary['restPeriods'] ?? 'N/A',
+                                  context,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      _buildCompactSummaryItem(
-                        Icons.directions_walk,
-                        'Steps',
-                        (summary['stepCount'] ?? 'N/A').toString(),
-                        context,
-                      ),
-                      _buildCompactSummaryItem(
-                        Icons.timer,
-                        'Rest',
-                        summary['restPeriods'] ?? 'N/A',
-                        context,
-                      ),
+
+                      // Workout Options Content
+                      workoutOptions.length > 1
+                          ? Container(
+                              height: MediaQuery.of(context).size.height *
+                                  0.7, // Limit height for TabBarView
+                              child: TabBarView(
+                                controller: _tabController,
+                                children: workoutOptions.map<Widget>((workout) {
+                                  return _buildWorkoutContent(workout, context);
+                                }).toList(),
+                              ),
+                            )
+                          : workoutOptions.isNotEmpty
+                              ? _buildWorkoutContent(workoutOptions[0], context)
+                              : _buildEmptyState(context),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-
-            // Workout Options Content
-            workoutOptions.length > 1
-                ? Container(
-                    height: MediaQuery.of(context).size.height *
-                        0.7, // Limit height for TabBarView
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: workoutOptions.map<Widget>((workout) {
-                        return _buildWorkoutContent(workout, context);
-                      }).toList(),
-                    ),
-                  )
-                : workoutOptions.isNotEmpty
-                    ? _buildWorkoutContent(workoutOptions[0], context)
-                    : _buildEmptyState(context),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -292,22 +338,16 @@ class _WorkoutPageState extends State<WorkoutPage>
           Container(
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Colors.white.withOpacity(0.05),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
             child: Row(
               children: [
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Color(0xFF6e9277).withOpacity(0.1),
+                    color: Color(0xFF6e9277).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -328,7 +368,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                               small: 20, medium: 24, large: 28),
                           fontWeight: FontWeight.bold,
                           fontFamily: 'Poppins',
-                          color: Colors.grey[800],
+                          color: Colors.white,
                         ),
                       ),
                       SizedBox(height: 4),
@@ -337,7 +377,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                         style: TextStyle(
                           fontSize: _getFontSize(context,
                               small: 14, medium: 16, large: 18),
-                          color: Colors.grey[600],
+                          color: Colors.white.withOpacity(0.7),
                           fontFamily: 'Poppins',
                         ),
                       ),
@@ -376,7 +416,7 @@ class _WorkoutPageState extends State<WorkoutPage>
               Container(
                 padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Color(0xFF6e9277).withOpacity(0.1),
+                  color: Color(0xFF6e9277).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -393,7 +433,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                       _getFontSize(context, small: 20, medium: 24, large: 28),
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Poppins',
-                  color: Colors.grey[800],
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -492,7 +532,7 @@ class _WorkoutPageState extends State<WorkoutPage>
             Icon(
               Icons.fitness_center_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: Colors.white.withOpacity(0.4),
             ),
             SizedBox(height: 16),
             Text(
@@ -500,7 +540,7 @@ class _WorkoutPageState extends State<WorkoutPage>
               style: TextStyle(
                 fontSize:
                     _getFontSize(context, small: 16, medium: 18, large: 20),
-                color: Colors.grey[600],
+                color: Colors.white.withOpacity(0.7),
                 fontFamily: 'Poppins',
               ),
             ),
@@ -561,15 +601,9 @@ class _WorkoutPageState extends State<WorkoutPage>
       child: Container(
         margin: EdgeInsets.only(bottom: _isSmallScreen(context) ? 12 : 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
         child: Padding(
           padding: EdgeInsets.all(_isSmallScreen(context) ? 16 : 20),
@@ -586,14 +620,14 @@ class _WorkoutPageState extends State<WorkoutPage>
                             small: 16, medium: 18, large: 20),
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Poppins',
-                        color: Colors.grey[800],
+                        color: Colors.white,
                       ),
                     ),
                   ),
                   // Add a hint icon
                   Icon(
                     Icons.swipe_left,
-                    color: Colors.grey[400],
+                    color: Colors.white.withOpacity(0.6),
                     size: 20,
                   ),
                 ],
@@ -711,7 +745,7 @@ class _WorkoutPageState extends State<WorkoutPage>
         Container(
           padding: EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Color(0xFF6e9277).withOpacity(0.1),
+            color: Color(0xFF6e9277).withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -731,7 +765,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                   fontSize:
                       _getFontSize(context, small: 12, medium: 13, large: 14),
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
+                  color: Colors.white.withOpacity(0.7),
                   fontFamily: 'Poppins',
                 ),
               ),
@@ -741,7 +775,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                 style: TextStyle(
                   fontSize:
                       _getFontSize(context, small: 14, medium: 15, large: 16),
-                  color: Colors.grey[800],
+                  color: Colors.white,
                   fontFamily: 'Poppins',
                 ),
               ),
@@ -759,6 +793,7 @@ class _WorkoutPageState extends State<WorkoutPage>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
+          backgroundColor: Color(0xFF1a1a1a),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -771,6 +806,7 @@ class _WorkoutPageState extends State<WorkoutPage>
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -779,6 +815,7 @@ class _WorkoutPageState extends State<WorkoutPage>
             'Save "${exercise['name'] ?? 'Exercise'}" to your favorites?',
             style: TextStyle(
               fontFamily: 'Poppins',
+              color: Colors.white.withOpacity(0.9),
             ),
           ),
           actions: [
@@ -787,7 +824,7 @@ class _WorkoutPageState extends State<WorkoutPage>
               child: Text(
                 'Cancel',
                 style: TextStyle(
-                  color: Colors.grey[600],
+                  color: Colors.white.withOpacity(0.7),
                   fontFamily: 'Poppins',
                 ),
               ),

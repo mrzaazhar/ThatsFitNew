@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'widgets/workout_video_player.dart';
 
 class SavedWorkoutPage extends StatefulWidget {
   @override
@@ -225,37 +226,49 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFf8f9fa),
-      appBar: AppBar(
-        title: Text(
-          'My Favorite Exercises',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
+      backgroundColor: Color(0xFF1a1a1a),
+      body: Column(
+        children: [
+          // Custom App Bar
+          Container(
+            padding: EdgeInsets.only(top: 24),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'My Favorite Exercises',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                  Spacer(),
+                ],
+              ),
+            ),
           ),
-        ),
-        backgroundColor: Color(0xFF6e9277),
-        elevation: 0,
-        iconTheme: IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.fitness_center),
-            onPressed: _showCustomRoutines,
-            tooltip: 'View Custom Routines',
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _loadSavedWorkouts,
-            tooltip: 'Refresh',
+          // Main Content
+          Expanded(
+            child: _isLoading
+                ? _buildLoadingState()
+                : _savedWorkouts.isEmpty
+                    ? _buildEmptyState()
+                    : _buildWorkoutsList(),
           ),
         ],
       ),
-      body: _isLoading
-          ? _buildLoadingState()
-          : _savedWorkouts.isEmpty
-              ? _buildEmptyState()
-              : _buildWorkoutsList(),
     );
   }
 
@@ -265,14 +278,14 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00FF88)),
           ),
           SizedBox(height: 20),
           Text(
             'Loading your favorite exercises...',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: Colors.white,
               fontFamily: 'Poppins',
             ),
           ),
@@ -291,13 +304,13 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
             Container(
               padding: EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Color(0xFF6e9277).withOpacity(0.1),
+                color: Color(0xFF00FF88).withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.favorite_border,
                 size: 80,
-                color: Color(0xFF6e9277),
+                color: Color(0xFF00FF88),
               ),
             ),
             SizedBox(height: 32),
@@ -306,7 +319,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Colors.white,
                 fontFamily: 'Poppins',
               ),
             ),
@@ -316,18 +329,19 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: Colors.white70,
                 fontFamily: 'Poppins',
               ),
             ),
             SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
-              icon: Icon(Icons.arrow_back),
-              label: Text('Go Back to Workouts'),
+              icon: Icon(Icons.arrow_back, color: Colors.black),
+              label: Text('Go Back to Workouts',
+                  style: TextStyle(color: Colors.black)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF6e9277),
-                foregroundColor: Colors.white,
+                backgroundColor: Color(0xFF00FF88),
+                foregroundColor: Colors.black,
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -344,12 +358,18 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
   Widget _buildWorkoutsList() {
     return RefreshIndicator(
       onRefresh: _loadSavedWorkouts,
-      color: Color(0xFF6e9277),
+      color: Color(0xFF00FF88),
       child: ListView.builder(
         padding: EdgeInsets.all(16),
         itemCount: _savedWorkouts.length,
         itemBuilder: (context, index) {
-          return _buildExerciseCard(_savedWorkouts[index]);
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: _buildExerciseCard(_savedWorkouts[index]),
+            ),
+          );
         },
       ),
     );
@@ -357,15 +377,15 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
 
   Widget _buildExerciseCard(Map<String, dynamic> workout) {
     return Container(
-      margin: EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: Color(0xFF232323),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -376,44 +396,27 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
           Container(
             padding: EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF6e9277).withOpacity(0.1),
-                  Color(0xFF6e9277).withOpacity(0.05),
-                ],
-              ),
+              color: Color(0xFF2d2d2d),
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
               ),
             ),
             child: Row(
               children: [
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF6e9277),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.fitness_center,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: 16),
+                SizedBox(width: 0),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        workout['exerciseName'] ?? 'Unknown Exercise',
+                        (workout['exerciseName'] ?? 'Unknown Exercise')
+                            .replaceAll('*', '')
+                            .trim(),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                          color: Colors.white,
                           fontFamily: 'Poppins',
                         ),
                       ),
@@ -422,7 +425,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                         'Saved on ${_formatDate(workout['savedAt'])}',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: Colors.white70,
                           fontFamily: 'Poppins',
                         ),
                       ),
@@ -433,26 +436,17 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                   onPressed: () => _showDeleteConfirmation(workout['id']),
                   icon: Icon(
                     Icons.delete_outline,
-                    color: Colors.red[400],
+                    color: Colors.redAccent,
                     size: 24,
                   ),
                   tooltip: 'Remove from favorites',
-                ),
-                IconButton(
-                  onPressed: () => _showCreateRoutineDialog(workout),
-                  icon: Icon(
-                    Icons.add_circle_outline,
-                    color: Color(0xFF6e9277),
-                    size: 24,
-                  ),
-                  tooltip: 'Create Custom Routine',
                 ),
                 IconButton(
                   onPressed: () =>
                       _openVideoPlayer(workout['exerciseName'] ?? 'Exercise'),
                   icon: Icon(
                     Icons.play_circle_outline,
-                    color: Color(0xFF6e9277),
+                    color: Colors.white,
                     size: 24,
                   ),
                   tooltip: 'Watch Video',
@@ -487,11 +481,140 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                 // Create Custom Routine Button
                 Container(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showCreateRoutineDialog(workout),
-                    icon: Icon(Icons.add_circle_outline, color: Colors.white),
-                    label: Text(
-                      'Create Custom Routine',
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final setsAndReps = workout['setsAndReps'] ?? '';
+                      final restPeriod = workout['restPeriod'] ?? '';
+                      final setsController = TextEditingController(text: setsAndReps.split('x').first.trim());
+                      final repsController = TextEditingController(text: setsAndReps.contains('x') ? setsAndReps.split('x').last.trim() : '');
+                      final restController = TextEditingController(text: restPeriod.toString());
+
+                      final result = await showDialog<Map<String, String>>(
+                        context: context,
+                        builder: (context) {
+                          return AlertDialog(
+                            backgroundColor: Color(0xFF232323),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            title: Text(
+                              'Edit Routine',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: setsController,
+                                        keyboardType: TextInputType.number,
+                                        style: TextStyle(color: Colors.white),
+                                        decoration: InputDecoration(
+                                          labelText: 'Sets',
+                                          labelStyle: TextStyle(color: Colors.white70),
+                                          filled: true,
+                                          fillColor: Color(0xFF1a1a1a),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide(color: Colors.white24),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: repsController,
+                                        keyboardType: TextInputType.number,
+                                        style: TextStyle(color: Colors.white),
+                                        decoration: InputDecoration(
+                                          labelText: 'Reps',
+                                          labelStyle: TextStyle(color: Colors.white70),
+                                          filled: true,
+                                          fillColor: Color(0xFF1a1a1a),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide(color: Colors.white24),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 16),
+                                TextField(
+                                  controller: restController,
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    labelText: 'Rest Period (seconds)',
+                                    labelStyle: TextStyle(color: Colors.white70),
+                                    filled: true,
+                                    fillColor: Color(0xFF1a1a1a),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: Colors.white24),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: Text('Cancel', style: TextStyle(color: Colors.white70, fontFamily: 'Poppins')),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop({
+                                    'sets': setsController.text,
+                                    'reps': repsController.text,
+                                    'rest': restController.text,
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF234932),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text('Save', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (result != null && result['sets'] != null && result['reps'] != null && result['rest'] != null) {
+                        final newSetsAndReps = '${result['sets']}x${result['reps']}';
+                        final newRest = result['rest'];
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user != null) {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .collection('workouts')
+                              .doc(workout['id'])
+                              .update({
+                            'setsAndReps': newSetsAndReps,
+                            'restPeriod': newRest,
+                          });
+                          setState(() {
+                            workout['setsAndReps'] = newSetsAndReps;
+                            workout['restPeriod'] = newRest;
+                          });
+                        }
+                      }
+                    },
+                    child: Text(
+                      'Edit Routine',
                       style: TextStyle(
                         color: Colors.white,
                         fontFamily: 'Poppins',
@@ -500,7 +623,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF6e9277),
+                      backgroundColor: Color(0xFF234932),
                       padding: EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -524,13 +647,13 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
         Container(
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Color(0xFF6e9277).withOpacity(0.1),
+            color: Color(0xFF00FF88).withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
             size: 20,
-            color: Color(0xFF6e9277),
+            color: Color(0xFF00FF88),
           ),
         ),
         SizedBox(width: 16),
@@ -543,7 +666,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
+                  color: Colors.white70,
                   fontFamily: 'Poppins',
                 ),
               ),
@@ -552,7 +675,7 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
                 value,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey[800],
+                  color: Colors.white,
                   fontFamily: 'Poppins',
                 ),
               ),
@@ -629,7 +752,14 @@ class _SavedWorkoutPageState extends State<SavedWorkoutPage>
   }
 
   Future<void> _openVideoPlayer(String exerciseName) async {
-    // Implementation of _openVideoPlayer method
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutVideoPlayer(
+          exerciseName: exerciseName,
+        ),
+      ),
+    );
   }
 
   Future<void> _showCreateRoutineDialog(Map<String, dynamic> workout) async {
