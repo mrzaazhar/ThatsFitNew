@@ -1217,7 +1217,7 @@ class _WorkoutPageState extends State<WorkoutPage>
       // Get completed workouts for the week
       final workoutsSnapshot = await FirebaseFirestore.instance
           .collection('users')
-          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .doc(user.uid)
           .collection('workout_history')
           .where('completedAt', isGreaterThanOrEqualTo: weekStart)
           .where('completedAt', isLessThanOrEqualTo: weekEnd)
@@ -1228,9 +1228,9 @@ class _WorkoutPageState extends State<WorkoutPage>
       // Get weekly goals
       final goalsDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .doc(user.uid)
           .collection('Weekly_Goals')
-          .doc('JNen8TcNA9IJiveXC6AX')
+          .doc('current_week')
           .get();
 
       int workoutGoal = 0;

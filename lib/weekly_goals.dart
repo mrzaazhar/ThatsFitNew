@@ -106,7 +106,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         // Get current week's goals
         final goalsDoc = await _firestore
             .collection('users')
-            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+            .doc(user.uid)
             .collection('Weekly_Goals')
             .doc('current_week')
             .get();
@@ -154,7 +154,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         // Get completed workouts for the week
         final workoutsSnapshot = await _firestore
             .collection('users')
-            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+            .doc(user.uid)
             .collection('workout_history')
             .where('completedAt', isGreaterThanOrEqualTo: weekStart)
             .where('completedAt', isLessThanOrEqualTo: weekEnd)
@@ -166,7 +166,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
         // Get step count for the week
         final profileSnapshot = await _firestore
             .collection('users')
-            .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+            .doc(user.uid)
             .collection('profile')
             .limit(1)
             .get();
@@ -225,7 +225,7 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
 
       await _firestore
           .collection('users')
-          .doc('GC6nC5cHvDQbvNhll6KghmezNo22')
+          .doc(user.uid)
           .collection('Weekly_Goals')
           .doc('current_week')
           .set(goalsData);
@@ -392,6 +392,10 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
 
                   // Save Button
                   _buildSaveButton(),
+                  SizedBox(height: 20),
+
+                  // Debug Section
+                  _buildDebugSection(),
                   SizedBox(height: 20),
                 ],
               ),
@@ -1003,6 +1007,320 @@ class _WeeklyGoalsPageState extends State<WeeklyGoalsPage> {
             fontFamily: 'Poppins',
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDebugSection() {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Color(0xFF2d2d2d),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Debug Notifications',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontFamily: 'Poppins',
+            ),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await NotificationService.scheduleTestNotification();
+                      _showSnackBar(
+                          'Test notification scheduled for 10 seconds!',
+                          Colors.green);
+                    } catch (e) {
+                      _showSnackBar(
+                          'Error scheduling test notification: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Test Notification',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final pending =
+                          await NotificationService.getPendingNotifications();
+                      _showSnackBar(
+                          '${pending.length} pending notifications found',
+                          Colors.blue);
+                      print('Pending notifications: $pending');
+                    } catch (e) {
+                      _showSnackBar(
+                          'Error checking notifications: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Check Pending',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final hasExactPermission =
+                          await NotificationService.checkExactAlarmPermission();
+                      if (hasExactPermission) {
+                        _showSnackBar(
+                            'Exact alarms are permitted! ✅', Colors.green);
+                      } else {
+                        _showSnackBar(
+                            'Exact alarms not permitted ❌', Colors.red);
+                        // Show permission instructions dialog
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: Text('Exact Alarm Permission Required'),
+                              content: Text(
+                                NotificationService
+                                    .getExactAlarmPermissionInstructions(),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: Text('OK'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      }
+                    } catch (e) {
+                      _showSnackBar(
+                          'Error checking permissions: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Check Permissions',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await NotificationService.cancelAllNotifications();
+                      _showSnackBar('All notifications cancelled', Colors.red);
+                    } catch (e) {
+                      _showSnackBar(
+                          'Error cancelling notifications: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel All',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final debugInfo =
+                          await NotificationService.debugNotificationIssues();
+
+                      // Show debug info in a dialog
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: Text('Notification Debug Info'),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                      'Service Initialized: ${debugInfo['service_initialized']}'),
+                                  Text(
+                                      'Android Plugin: ${debugInfo['android_plugin_available']}'),
+                                  Text(
+                                      'iOS Plugin: ${debugInfo['ios_plugin_available']}'),
+                                  Text(
+                                      'Android Permissions: ${debugInfo['android_permissions_granted']}'),
+                                  Text(
+                                      'iOS Permissions: ${debugInfo['ios_permissions_granted']}'),
+                                  Text(
+                                      'Any Permissions: ${debugInfo['any_permissions_granted']}'),
+                                  Text(
+                                      'Exact Alarm Permitted: ${debugInfo['exact_alarm_permitted']}'),
+                                  Text(
+                                      'Pending Notifications: ${debugInfo['pending_notifications_count']}'),
+                                  Text(
+                                      'Immediate Test: ${debugInfo['immediate_notification_test']}'),
+                                  Text(
+                                      'Scheduled Test: ${debugInfo['scheduled_notification_test']}'),
+                                  if (debugInfo['error'] != null)
+                                    Text('Error: ${debugInfo['error']}'),
+                                  SizedBox(height: 16),
+                                  Text('Pending Notifications:',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  ...(debugInfo['pending_notifications']
+                                          as List)
+                                      .map((n) => Text(
+                                          'ID: ${n['id']} - ${n['title']}'))
+                                      .toList(),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: Text('OK'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      print('Debug info: $debugInfo');
+                    } catch (e) {
+                      _showSnackBar('Error running debug: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Debug All',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Test a workout notification specifically
+                      await NotificationService.showNotification(
+                        id: 1001,
+                        title: 'Workout Reminder - 1 Hour',
+                        body:
+                            'Your Chest & Tricep workout starts in 1 hour! Time to prepare.',
+                      );
+                      _showSnackBar('Workout notification sent!', Colors.green);
+                    } catch (e) {
+                      _showSnackBar('Error: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Test Workout',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // Schedule a workout notification for 30 seconds from now
+                      final testTime =
+                          DateTime.now().add(Duration(seconds: 30));
+                      await NotificationService.scheduleWorkoutNotifications(
+                        dayKey: '2025-01-13',
+                        workoutTime:
+                            '${testTime.hour.toString().padLeft(2, '0')}:${testTime.minute.toString().padLeft(2, '0')}',
+                        bodyParts: ['Chest', 'Tricep'],
+                        baseNotificationId: 2000,
+                      );
+                      _showSnackBar(
+                          'Workout notification scheduled for 30 seconds!',
+                          Colors.blue);
+                    } catch (e) {
+                      _showSnackBar('Error: $e', Colors.red);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Schedule Workout',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

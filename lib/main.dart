@@ -7,6 +7,8 @@ import 'firebase_options.dart';
 import 'signup_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_application_1/services/notification_service.dart';
+import 'admin/admin_auth.dart';
+import 'admin/admin_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,6 +77,45 @@ class _LoginPageState extends State<LoginPage>
 
     try {
       print('Attempting login with email: ${_emailController.text.trim()}');
+
+      // Check if this is an admin login
+      if (_emailController.text.trim() == 'thatsfitAdmin@gmail.com' && 
+          _passwordController.text.trim() == 'thatsfitAdmin') {
+        print('Admin login detected');
+        
+        try {
+          // Login as admin
+          final success = await AdminAuth.loginAsAdmin();
+          
+          if (success) {
+            print('Admin login successful');
+            print('Navigating to AdminDashboard...');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Admin login successful!')),
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+            print('Navigation completed');
+            return;
+          } else {
+            print('Admin login failed');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Admin login failed. Please check credentials.')),
+            );
+            setState(() => _isLoading = false);
+            return;
+          }
+        } catch (e) {
+          print('Error during admin login: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Admin login error: $e')),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
 
       print('Calling Firebase Auth...');
       UserCredential userCredential =

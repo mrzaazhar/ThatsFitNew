@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'setup_profile.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'admin/admin_service.dart';
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -63,6 +64,9 @@ class _SignUpPageState extends State<SignUpPage> {
         'profileCompleted': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // Increment total user count in admin document
+      await AdminService.incrementUserCount();
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(

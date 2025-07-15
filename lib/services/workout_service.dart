@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 class WorkoutService {
   // Configuration for real device testing
   // This should be the IP address of your development machine where the backend server is running
-  final String baseUrl = 'http://192.168.1.4:3001/api';
+  final String baseUrl = 'http://172.20.10.4:3001/api';
 
   Future<Map<String, dynamic>> createWorkout({
     required String userId,

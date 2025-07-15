@@ -13,7 +13,7 @@ class _StepCountPageState extends State<StepCountPage> {
   int _currentSteps = 0;
   int _weeklyTotal = 0;
   final int dailyGoal = 10000;
-  final int weeklyGoal = 70000;
+  int _weeklyGoal = 70000; // Changed from final to variable
   DateTime? _lastResetDate;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -121,6 +121,20 @@ class _StepCountPageState extends State<StepCountPage> {
     _initializeApp();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh weekly goal when page becomes visible
+    _refreshWeeklyGoal();
+  }
+
+  Future<void> _refreshWeeklyGoal() async {
+    // Only refresh if the app is not in loading state
+    if (!_isLoading) {
+      await _loadWeeklyGoal();
+    }
+  }
+
   Future<void> _initializeApp() async {
     setState(() {
       _isLoading = true;
@@ -128,6 +142,9 @@ class _StepCountPageState extends State<StepCountPage> {
 
     try {
       print('=== Initializing Step Count App ===');
+
+      // Load weekly goal from user's saved goals
+      await _loadWeeklyGoal();
 
       // Initialize Health Connect first
       await _initHealthConnect();
@@ -152,6 +169,38 @@ class _StepCountPageState extends State<StepCountPage> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadWeeklyGoal() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Get current week's goals
+        final goalsDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('Weekly_Goals')
+            .doc('current_week')
+            .get();
+
+        if (goalsDoc.exists) {
+          final goalsData = goalsDoc.data()!;
+          final stepGoal = goalsData['stepGoal'] ?? 0;
+
+          setState(() {
+            _weeklyGoal =
+                stepGoal > 0 ? stepGoal : 70000; // Use saved goal or default
+          });
+
+          print('Loaded weekly goal: $_weeklyGoal steps');
+        } else {
+          print('No weekly goals found, using default: $_weeklyGoal steps');
+        }
+      }
+    } catch (e) {
+      print('Error loading weekly goal: $e');
+      // Keep default value if there's an error
     }
   }
 
@@ -995,7 +1044,7 @@ class _StepCountPageState extends State<StepCountPage> {
           TweenAnimationBuilder<double>(
             tween: Tween<double>(
               begin: 0,
-              end: weeklyTotal / weeklyGoal,
+              end: weeklyTotal / _weeklyGoal,
             ),
             duration: Duration(milliseconds: 800),
             builder: (context, value, child) {
@@ -1024,7 +1073,7 @@ class _StepCountPageState extends State<StepCountPage> {
                 ),
               ),
               Text(
-                '$weeklyGoal steps',
+                '$_weeklyGoal steps',
                 style: TextStyle(
                   fontSize:
                       _getFontSize(context, small: 14, medium: 15, large: 16),
