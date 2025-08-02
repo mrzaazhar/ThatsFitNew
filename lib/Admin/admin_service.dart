@@ -1,13 +1,195 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class AdminService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
-  /// Get all users with their profile data
+  // Backend server configuration
+  static const String baseUrl = 'http://192.168.0.171:3002/api/admin';
+
+  /// Get all users from backend server
+  static Future<List<Map<String, dynamic>>> getAllUsersFromBackend() async {
+    try {
+      print('🌐 Making HTTP request to: $baseUrl/users');
+      final response = await http.get(
+        Uri.parse('$baseUrl/users'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body length: ${response.body.length} characters');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final users = List<Map<String, dynamic>>.from(data['users'] ?? []);
+        print('✅ Users parsed: ${users.length} users');
+        return users;
+      } else {
+        print(
+            '❌ Error getting users: ${response.statusCode} - ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Error connecting to backend: $e');
+      return [];
+    }
+  }
+
+  /// Get total user count from backend
+  static Future<int> getTotalUserCount() async {
+    try {
+      print('🌐 Making HTTP request to: $baseUrl/users/count');
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/count'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final totalUsers = data['totalUsers'] ?? 0;
+        print('✅ Total users parsed: $totalUsers');
+        return totalUsers;
+      } else {
+        print(
+            '❌ Error getting user count: ${response.statusCode} - ${response.body}');
+        return 0;
+      }
+    } catch (e) {
+      print('❌ Error connecting to backend: $e');
+      return 0;
+    }
+  }
+
+  /// Get active users count from backend
+  static Future<int> getActiveUsersCount() async {
+    try {
+      print('🌐 Making HTTP request to: $baseUrl/users/active');
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/active'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final activeUsers = data['activeUsers'] ?? 0;
+        print('✅ Active users parsed: $activeUsers');
+        return activeUsers;
+      } else {
+        print(
+            '❌ Error getting active users count: ${response.statusCode} - ${response.body}');
+        return 0;
+      }
+    } catch (e) {
+      print('❌ Error connecting to backend: $e');
+      return 0;
+    }
+  }
+
+  /// Create user through backend
+  static Future<Map<String, dynamic>> createUserViaBackend({
+    required String email,
+    required String password,
+    required String name,
+    String? username,
+    int? age,
+    double? weight,
+    String? gender,
+    String? experience,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/users'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'email': email,
+              'password': password,
+              'displayName': name,
+              'name': name,
+              'username': username,
+              'age': age,
+              'weight': weight,
+              'gender': gender,
+              'experience': experience,
+            }),
+          )
+          .timeout(Duration(seconds: 30));
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['error'] ?? 'Failed to create user');
+      }
+    } catch (e) {
+      print('Error creating user via backend: $e');
+      rethrow;
+    }
+  }
+
+  /// Update user through backend
+  static Future<bool> updateUserViaBackend({
+    required String uid,
+    String? name,
+    String? username,
+    String? email,
+    int? age,
+    double? weight,
+    String? gender,
+    String? experience,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{};
+      if (name != null) updateData['name'] = name;
+      if (username != null) updateData['username'] = username;
+      if (email != null) updateData['email'] = email;
+      if (age != null) updateData['age'] = age;
+      if (weight != null) updateData['weight'] = weight;
+      if (gender != null) updateData['gender'] = gender;
+      if (experience != null) updateData['experience'] = experience;
+
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/users/$uid'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'updateData': updateData}),
+          )
+          .timeout(Duration(seconds: 30));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating user via backend: $e');
+      return false;
+    }
+  }
+
+  /// Delete user through backend
+  static Future<bool> deleteUserViaBackend(String uid) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/users/$uid'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(Duration(seconds: 30));
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error deleting user via backend: $e');
+      return false;
+    }
+  }
+
+  /// Get all users with their profile data (legacy method)
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       final usersSnapshot = await _firestore.collection('users').get();
@@ -81,7 +263,7 @@ class AdminService {
     }
   }
 
-  /// Create a new user
+  /// Create a new user (legacy method)
   static Future<bool> createUser({
     required String email,
     required String password,
@@ -137,7 +319,7 @@ class AdminService {
     }
   }
 
-  /// Update user profile
+  /// Update user profile (legacy method)
   static Future<bool> updateUser({
     required String userId,
     String? name,
@@ -190,7 +372,7 @@ class AdminService {
     }
   }
 
-  /// Delete user
+  /// Delete user (legacy method)
   static Future<bool> deleteUser(String userId) async {
     try {
       // Delete user document and all subcollections
@@ -198,7 +380,6 @@ class AdminService {
 
       // Note: Deleting from Firebase Auth requires admin SDK
       // This would typically be done through a backend API
-
       return true;
     } catch (e) {
       print('Error deleting user: $e');
@@ -248,49 +429,28 @@ class AdminService {
           'createdAt': FieldValue.serverTimestamp(),
           'lastUpdated': FieldValue.serverTimestamp(),
         });
-        print('Admin document created with initial count: 0');
         return 0;
       }
     } catch (e) {
       print('Error getting total user count from admin document: $e');
-      print('This might be due to Firestore permissions. Using fallback...');
       return 0;
     }
   }
 
-  /// Update total user count in admin document
-  static Future<void> updateTotalUserCount(int count) async {
+  /// Get active users count from Cloud Function
+  static Future<int> getActiveUsersCountFromAuth() async {
     try {
-      print('Updating total user count to: $count');
-      await _firestore.collection('admin').doc('71N1ZTeAUol0zHf2ZCiI').update({
-        'totalUsers': count,
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
-      print('Total user count updated successfully');
+      print('Calling Cloud Function to get active user count...');
+
+      final callable = _functions.httpsCallable('getActiveUsersCount');
+      final result = await callable.call();
+
+      final activeUsers = result.data['activeUsers'] as int;
+      print('Active users from Cloud Function: $activeUsers');
+      return activeUsers;
     } catch (e) {
-      print('Error updating total user count: $e');
-    }
-  }
-
-  /// Increment total user count (call this when a new user registers)
-  static Future<void> incrementUserCount() async {
-    try {
-      print('Incrementing user count...');
-      final adminDoc = await _firestore
-          .collection('admin')
-          .doc('71N1ZTeAUol0zHf2ZCiI')
-          .get();
-
-      int currentCount = 0;
-      if (adminDoc.exists) {
-        currentCount = adminDoc.data()?['totalUsers'] ?? 0;
-      }
-
-      final newCount = currentCount + 1;
-      await updateTotalUserCount(newCount);
-      print('User count incremented to: $newCount');
-    } catch (e) {
-      print('Error incrementing user count: $e');
+      print('Error getting active user count from Cloud Function: $e');
+      return 0;
     }
   }
 
@@ -441,6 +601,343 @@ class AdminService {
     }
   }
 
+  /// Make requests to all GET endpoints and store responses in Firebase
+  static Future<void> refreshAllEndpoints() async {
+    try {
+      print('🔄 Making requests to all GET endpoints...');
+
+      final responses = <String, dynamic>{};
+
+      // GET /api/admin/health
+      try {
+        print('📡 Requesting: GET /api/admin/health');
+        final healthResponse = await http.get(
+          Uri.parse('$baseUrl/health'),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(Duration(seconds: 30));
+
+        responses['health'] = {
+          'statusCode': healthResponse.statusCode,
+          'body': healthResponse.body,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        print('✅ Health endpoint response: ${healthResponse.statusCode}');
+      } catch (e) {
+        print('❌ Health endpoint error: $e');
+        responses['health'] = {
+          'error': e.toString(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+      }
+
+      // GET /api/admin/users
+      try {
+        print('📡 Requesting: GET /api/admin/users');
+        final usersResponse = await http.get(
+          Uri.parse('$baseUrl/users'),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(Duration(seconds: 30));
+
+        responses['users'] = {
+          'statusCode': usersResponse.statusCode,
+          'body': usersResponse.body,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        print('✅ Users endpoint response: ${usersResponse.statusCode}');
+      } catch (e) {
+        print('❌ Users endpoint error: $e');
+        responses['users'] = {
+          'error': e.toString(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+      }
+
+      // GET /api/admin/users/count
+      try {
+        print('📡 Requesting: GET /api/admin/users/count');
+        final countResponse = await http.get(
+          Uri.parse('$baseUrl/users/count'),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(Duration(seconds: 30));
+
+        responses['users_count'] = {
+          'statusCode': countResponse.statusCode,
+          'body': countResponse.body,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        print('✅ Users count endpoint response: ${countResponse.statusCode}');
+      } catch (e) {
+        print('❌ Users count endpoint error: $e');
+        responses['users_count'] = {
+          'error': e.toString(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+      }
+
+      // GET /api/admin/users/active
+      try {
+        print('📡 Requesting: GET /api/admin/users/active');
+        final activeResponse = await http.get(
+          Uri.parse('$baseUrl/users/active'),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(Duration(seconds: 30));
+
+        responses['users_active'] = {
+          'statusCode': activeResponse.statusCode,
+          'body': activeResponse.body,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        print('✅ Users active endpoint response: ${activeResponse.statusCode}');
+      } catch (e) {
+        print('❌ Users active endpoint error: $e');
+        responses['users_active'] = {
+          'error': e.toString(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+      }
+
+      // Store all responses in Firebase admin document
+      await _firestore.collection('admin').doc('71N1ZTeAUol0zHf2ZCiI').set({
+        'endpointResponses': responses,
+        'lastRefresh': FieldValue.serverTimestamp(),
+        'refreshStatus': 'completed',
+      }, SetOptions(merge: true));
+
+      print('✅ All endpoint responses stored in Firebase');
+    } catch (e) {
+      print('❌ Error refreshing endpoints: $e');
+
+      // Store error status in Firebase
+      await _firestore.collection('admin').doc('71N1ZTeAUol0zHf2ZCiI').set({
+        'refreshStatus': 'error',
+        'lastError': e.toString(),
+        'lastRefresh': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  /// Get admin data from Firebase
+  static Future<Map<String, dynamic>> getAdminDataFromFirebase() async {
+    try {
+      print('📊 Loading admin data from Firebase...');
+      final adminDoc = await _firestore
+          .collection('admin')
+          .doc('71N1ZTeAUol0zHf2ZCiI')
+          .get();
+
+      if (adminDoc.exists) {
+        final data = adminDoc.data()!;
+        print('✅ Admin data loaded from Firebase');
+        return data;
+      } else {
+        print(
+            '⚠️ No admin data found in Firebase, creating initial document...');
+        // Create initial admin document
+        await _firestore.collection('admin').doc('71N1ZTeAUol0zHf2ZCiI').set({
+          'totalUsers': 0,
+          'activeUsers': 0,
+          'recentUsers': [],
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'serverStatus': 'initialized',
+        });
+        return {
+          'totalUsers': 0,
+          'activeUsers': 0,
+          'recentUsers': [],
+          'serverStatus': 'initialized',
+        };
+      }
+    } catch (e) {
+      print('❌ Error loading admin data from Firebase: $e');
+      return {
+        'totalUsers': 0,
+        'activeUsers': 0,
+        'recentUsers': [],
+        'serverStatus': 'error',
+      };
+    }
+  }
+
+  /// Get total users from Firebase (for UI)
+  static Future<int> getTotalUsersFromFirebase() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      return adminData['totalUsers'] ?? 0;
+    } catch (e) {
+      print('❌ Error getting total users from Firebase: $e');
+      return 0;
+    }
+  }
+
+  /// Get active users from Firebase (for UI)
+  static Future<int> getActiveUsersFromFirebase() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      return adminData['activeUsers'] ?? 0;
+    } catch (e) {
+      print('❌ Error getting active users from Firebase: $e');
+      return 0;
+    }
+  }
+
+  /// Get recent users from Firebase (for UI)
+  static Future<List<Map<String, dynamic>>> getRecentUsersFromFirebase() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final recentUsers = adminData['recentUsers'] ?? [];
+      return List<Map<String, dynamic>>.from(recentUsers);
+    } catch (e) {
+      print('❌ Error getting recent users from Firebase: $e');
+      return [];
+    }
+  }
+
+  /// Get total users from stored endpoint response
+  static Future<int> getTotalUsersFromStoredResponse() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final endpointResponses =
+          adminData['endpointResponses'] as Map<String, dynamic>?;
+
+      if (endpointResponses != null &&
+          endpointResponses['users_count'] != null) {
+        final response = endpointResponses['users_count'];
+        if (response['statusCode'] == 200) {
+          final data = json.decode(response['body']);
+          final totalUsers = data['totalUsers'] ?? 0;
+          print('✅ Total users from stored response: $totalUsers');
+          return totalUsers;
+        }
+      }
+
+      // Fallback to existing method
+      return await getTotalUsersFromFirebase();
+    } catch (e) {
+      print('❌ Error getting total users from stored response: $e');
+      return await getTotalUsersFromFirebase();
+    }
+  }
+
+  /// Get active users from stored endpoint response
+  static Future<int> getActiveUsersFromStoredResponse() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final endpointResponses =
+          adminData['endpointResponses'] as Map<String, dynamic>?;
+
+      if (endpointResponses != null &&
+          endpointResponses['users_active'] != null) {
+        final response = endpointResponses['users_active'];
+        if (response['statusCode'] == 200) {
+          final data = json.decode(response['body']);
+          final activeUsers = data['activeUsers'] ?? 0;
+          print('✅ Active users from stored response: $activeUsers');
+          return activeUsers;
+        }
+      }
+
+      // Fallback to existing method
+      return await getActiveUsersFromFirebase();
+    } catch (e) {
+      print('❌ Error getting active users from stored response: $e');
+      return await getActiveUsersFromFirebase();
+    }
+  }
+
+  /// Get recent users from stored endpoint response
+  static Future<List<Map<String, dynamic>>>
+      getRecentUsersFromStoredResponse() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final endpointResponses =
+          adminData['endpointResponses'] as Map<String, dynamic>?;
+
+      if (endpointResponses != null && endpointResponses['users'] != null) {
+        final response = endpointResponses['users'];
+        if (response['statusCode'] == 200) {
+          final data = json.decode(response['body']);
+          final users = List<Map<String, dynamic>>.from(data['users'] ?? []);
+          print('✅ Recent users from stored response: ${users.length} users');
+          return users.take(5).toList(); // Return only first 5rs
+        }
+      }
+
+      // Fallback to existing method
+      return await getRecentUsersFromFirebase();
+    } catch (e) {
+      print('❌ Error getting recent users from stored response: $e');
+      return await getRecentUsersFromFirebase();
+    }
+  }
+
+  /// Get server health status from stored response
+  static Future<String> getServerHealthStatus() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final endpointResponses =
+          adminData['endpointResponses'] as Map<String, dynamic>?;
+
+      if (endpointResponses != null && endpointResponses['health'] != null) {
+        final response = endpointResponses['health'];
+        if (response['statusCode'] == 200) {
+          return 'Online';
+        } else {
+          return 'Error (${response['statusCode']})';
+        }
+      }
+
+      return 'Unknown';
+    } catch (e) {
+      print('❌ Error getting server health status: $e');
+      return 'Unknown';
+    }
+  }
+
+  /// Get last refresh timestamp
+  static Future<String> getLastRefreshTime() async {
+    try {
+      final adminData = await getAdminDataFromFirebase();
+      final lastRefresh = adminData['lastRefresh'] as Timestamp?;
+
+      if (lastRefresh != null) {
+        final dateTime = lastRefresh.toDate();
+        return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+      }
+
+      return 'Never';
+    } catch (e) {
+      print('❌ Error getting last refresh time: $e');
+      return 'Unknown';
+    }
+  }
+
+  /// Check if admin data needs refresh (older than 5 minutes)
+  static Future<bool> shouldRefreshAdminData() async {
+    try {
+      final adminDoc = await _firestore
+          .collection('admin')
+          .doc('71N1ZTeAUol0zHf2ZCiI')
+          .get();
+
+      if (!adminDoc.exists) return true;
+
+      final data = adminDoc.data()!;
+      final lastUpdated = data['lastUpdated'] as Timestamp?;
+
+      if (lastUpdated == null) return true;
+
+      final now = DateTime.now();
+      final lastUpdate = lastUpdated.toDate();
+      final difference = now.difference(lastUpdate).inMinutes;
+
+      print('⏰ Last update: $lastUpdate, Minutes ago: $difference');
+      return difference > 5; // Refresh if older than 5 minutes
+    } catch (e) {
+      print('❌ Error checking refresh status: $e');
+      return true;
+    }
+  }
+
   static String _getDayName(int weekday) {
     switch (weekday) {
       case 1:
@@ -459,6 +956,37 @@ class AdminService {
         return 'Sun';
       default:
         return '';
+    }
+  }
+
+  static Future<void> createAdminDocumentIfNotExists() async {
+    try {
+      print('🔧 Creating admin document if not exists...');
+
+      final adminDoc = await _firestore
+          .collection('admin')
+          .doc('71N1ZTeAUol0zHf2ZCiI')
+          .get();
+
+      if (!adminDoc.exists) {
+        await _firestore.collection('admin').doc('71N1ZTeAUol0zHf2ZCiI').set({
+          'email': 'thatsfitAdmin@gmail.com',
+          'role': 'admin',
+          'totalUsers': 0,
+          'activeUsers': 0,
+          'recentUsers': [],
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'serverStatus': 'initialized',
+          'endpointResponses': {},
+          'lastRefresh': FieldValue.serverTimestamp(),
+          'refreshStatus': 'initialized',
+        });
+        print('✅ Admin document created successfully');
+      } else {
+        print('✅ Admin document already exists');
+      }
+    } catch (e) {
+      print('❌ Error creating admin document: $e');
     }
   }
 }

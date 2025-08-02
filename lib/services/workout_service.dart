@@ -4,7 +4,22 @@ import 'package:http/http.dart' as http;
 class WorkoutService {
   // Configuration for real device testing
   // This should be the IP address of your development machine where the backend server is running
-  final String baseUrl = 'http://172.20.10.4:3001/api';
+  final String baseUrl = 'http://192.168.0.171:3001/api';
+
+  /// Utility function to get current day consistently across the app
+  static String getCurrentDay() {
+    final now = DateTime.now();
+    final days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    return days[now.weekday - 1]; // weekday returns 1-7, where 1 is Monday
+  }
 
   Future<Map<String, dynamic>> createWorkout({
     required String userId,

@@ -280,7 +280,26 @@ class DeleteProfilePage extends StatelessWidget {
           ),
         );
 
+        // Add a small delay to ensure the snackbar is shown before navigation
+        await Future.delayed(Duration(milliseconds: 500));
+
         // Navigate to login page and clear all previous routes
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => LoginPage()),
+          (route) => false,
+        );
+      } else {
+        // If no user is found, still redirect to login page
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No user account found. Redirecting to login page.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+
+        await Future.delayed(Duration(milliseconds: 500));
+
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => LoginPage()),
@@ -291,6 +310,19 @@ class DeleteProfilePage extends StatelessWidget {
       String message = 'Error deleting account';
       if (e.code == 'requires-recent-login') {
         message = 'Please sign in again before deleting your account';
+        // Even if there's an error, redirect to login page after showing error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+
+        await Future.delayed(Duration(milliseconds: 2000));
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => LoginPage()),
+          (route) => false,
+        );
+        return;
       }
       ScaffoldMessenger.of(
         context,
@@ -298,6 +330,14 @@ class DeleteProfilePage extends StatelessWidget {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting account: ${e.toString()}')),
+      );
+      // Even if there's an error, redirect to login page after showing error
+      await Future.delayed(Duration(milliseconds: 2000));
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+        (route) => false,
       );
     }
   }

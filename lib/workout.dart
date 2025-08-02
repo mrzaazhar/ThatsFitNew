@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'widgets/workout_video_player.dart';
 import 'services/youtube_service.dart';
 import 'services/workout_recording_service.dart';
@@ -590,83 +591,79 @@ class _WorkoutPageState extends State<WorkoutPage>
         exercise['details']?['videoId'] ??
         YouTubeService.getVideoId(exercise['name'] ?? 'Exercise');
 
-    return GestureDetector(
-      onPanEnd: (details) {
-        // Check if the swipe was significant enough (right to left)
-        if (details.velocity.pixelsPerSecond.dx < -500) {
-          // Show confirmation dialog
-          _showSaveConfirmationDialog(exercise, context);
-        }
-      },
-      child: Container(
-        margin: EdgeInsets.only(bottom: _isSmallScreen(context) ? 12 : 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(_isSmallScreen(context) ? 16 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      exercise['name'] ?? 'Exercise',
-                      style: TextStyle(
-                        fontSize: _getFontSize(context,
-                            small: 16, medium: 18, large: 20),
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                        color: Colors.white,
-                      ),
+    return Container(
+      margin: EdgeInsets.only(bottom: _isSmallScreen(context) ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(_isSmallScreen(context) ? 16 : 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    exercise['name'] ?? 'Exercise',
+                    style: TextStyle(
+                      fontSize: _getFontSize(context,
+                          small: 16, medium: 18, large: 20),
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Poppins',
+                      color: Colors.white,
                     ),
                   ),
-                  // Add a hint icon
-                  Icon(
-                    Icons.swipe_left,
-                    color: Colors.white.withOpacity(0.6),
-                    size: 20,
-                  ),
-                ],
-              ),
-              SizedBox(height: 16),
-
-              // Video Thumbnail Section (if video ID is available)
-              if (videoId != null &&
-                  videoId != 'dQw4w9WgXcQ') // Don't show for default video
-                Container(
-                  margin: EdgeInsets.only(bottom: 16),
-                  child: _buildVideoThumbnail(
-                      videoId, exercise['name'] ?? 'Exercise', context),
                 ),
+                // Hold to save button
+                _buildHoldToSaveButton(exercise, context),
+              ],
+            ),
+            SizedBox(height: 16),
 
-              _buildExerciseDetail(
-                Icons.repeat,
-                'Sets & Reps',
-                exercise['details']?['setsAndReps'] ?? 'N/A',
-                context,
+            // Video Thumbnail Section (if video ID is available)
+            if (videoId != null &&
+                videoId != 'dQw4w9WgXcQ') // Don't show for default video
+              Container(
+                margin: EdgeInsets.only(bottom: 16),
+                child: _buildVideoThumbnail(
+                    videoId, exercise['name'] ?? 'Exercise', context),
               ),
-              SizedBox(height: 12),
-              _buildExerciseDetail(
-                Icons.timer,
-                'Rest Period',
-                exercise['details']?['restPeriod'] ?? 'N/A',
-                context,
-              ),
-              SizedBox(height: 12),
-              _buildExerciseDetail(
-                Icons.info_outline,
-                'Form Tips',
-                exercise['details']?['formTips'] ?? 'N/A',
-                context,
-              ),
-            ],
-          ),
+
+            _buildExerciseDetail(
+              Icons.repeat,
+              'Sets & Reps',
+              exercise['details']?['setsAndReps'] ?? 'N/A',
+              context,
+            ),
+            SizedBox(height: 12),
+            _buildExerciseDetail(
+              Icons.timer,
+              'Rest Period',
+              exercise['details']?['restPeriod'] ?? 'N/A',
+              context,
+            ),
+            SizedBox(height: 12),
+            _buildExerciseDetail(
+              Icons.info_outline,
+              'Form Tips',
+              exercise['details']?['formTips'] ?? 'N/A',
+              context,
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHoldToSaveButton(
+      Map<String, dynamic> exercise, BuildContext context) {
+    return HoldToSaveButton(
+      exercise: exercise,
+      onSave: () => _saveExerciseToFavorites(exercise),
+      onShowConfirmation: () => _showSaveConfirmationDialog(exercise, context),
     );
   }
 
@@ -1392,6 +1389,129 @@ class _WorkoutPageState extends State<WorkoutPage>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Custom widget for hold-to-save functionality
+class HoldToSaveButton extends StatefulWidget {
+  final Map<String, dynamic> exercise;
+  final VoidCallback onSave;
+  final VoidCallback onShowConfirmation;
+
+  const HoldToSaveButton({
+    Key? key,
+    required this.exercise,
+    required this.onSave,
+    required this.onShowConfirmation,
+  }) : super(key: key);
+
+  @override
+  _HoldToSaveButtonState createState() => _HoldToSaveButtonState();
+}
+
+class _HoldToSaveButtonState extends State<HoldToSaveButton>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _progressAnimation;
+  bool _isHolding = false;
+  Timer? _holdTimer;
+  static const int _holdDuration = 3000; // 3 seconds
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: _holdDuration),
+      vsync: this,
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    if (_isHolding) return;
+
+    setState(() {
+      _isHolding = true;
+    });
+
+    _animationController.forward();
+
+    _holdTimer = Timer(Duration(milliseconds: _holdDuration), () {
+      if (_isHolding) {
+        widget.onShowConfirmation();
+        _resetHold();
+      }
+    });
+  }
+
+  void _resetHold() {
+    setState(() {
+      _isHolding = false;
+    });
+
+    _animationController.reset();
+    _holdTimer?.cancel();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _startHold(),
+      onTapUp: (_) => _resetHold(),
+      onTapCancel: _resetHold,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: _isHolding
+              ? Color(0xFF6e9277).withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color:
+                _isHolding ? Color(0xFF6e9277) : Colors.white.withOpacity(0.3),
+            width: _isHolding ? 2 : 1,
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Progress indicator
+            if (_isHolding)
+              AnimatedBuilder(
+                animation: _progressAnimation,
+                builder: (context, child) {
+                  return CircularProgressIndicator(
+                    value: _progressAnimation.value,
+                    strokeWidth: 2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                  );
+                },
+              ),
+            // Icon
+            Center(
+              child: Icon(
+                _isHolding ? Icons.favorite : Icons.favorite_border,
+                color: _isHolding
+                    ? Color(0xFF6e9277)
+                    : Colors.white.withOpacity(0.7),
+                size: 20,
+              ),
+            ),
+          ],
         ),
       ),
     );

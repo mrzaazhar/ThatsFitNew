@@ -23,7 +23,7 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
     });
 
     try {
-      final users = await AdminService.getAllUsers();
+      final users = await AdminService.getAllUsersFromBackend();
       setState(() {
         _users = users;
         _isLoading = false;
@@ -46,10 +46,10 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
       final email = user['email']?.toString().toLowerCase() ?? '';
       final username = user['username']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
-      
-      return name.contains(query) || 
-             email.contains(query) || 
-             username.contains(query);
+
+      return name.contains(query) ||
+          email.contains(query) ||
+          username.contains(query);
     }).toList();
   }
 
@@ -156,7 +156,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
             child: _isLoading
                 ? Center(
                     child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
                     ),
                   )
                 : _filteredUsers.isEmpty
@@ -192,12 +193,14 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
         leading: CircleAvatar(
           backgroundColor: Color(0xFF33443c),
           child: Text(
-            (user['name'] as String).substring(0, 1).toUpperCase(),
+            (user['displayName'] ?? user['name'] ?? 'U')
+                .substring(0, 1)
+                .toUpperCase(),
             style: TextStyle(color: Colors.white),
           ),
         ),
         title: Text(
-          user['name'] ?? 'Unknown',
+          user['displayName'] ?? user['name'] ?? 'Unknown',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
@@ -218,13 +221,15 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
                 _buildUserInfoRow('Age', '${user['age'] ?? 0} years'),
                 _buildUserInfoRow('Weight', '${user['weight'] ?? 0} kg'),
                 _buildUserInfoRow('Gender', user['gender'] ?? 'Unknown'),
-                _buildUserInfoRow('Experience', user['experience'] ?? 'Unknown'),
-                _buildUserInfoRow('Workouts', '${user['workoutCount']} completed'),
-                _buildUserInfoRow('Weekly Steps', '${user['weeklySteps']} steps'),
-                _buildUserInfoRow('Profile Completed', user['profileCompleted'] ? 'Yes' : 'No'),
-                
+                _buildUserInfoRow(
+                    'Experience', user['experience'] ?? 'Unknown'),
+                _buildUserInfoRow(
+                    'Workouts', '${user['workoutCount'] ?? 0} completed'),
+                _buildUserInfoRow(
+                    'Weekly Steps', '${user['weeklySteps'] ?? 0} steps'),
+                _buildUserInfoRow('Profile Completed',
+                    user['profileCompleted'] ?? false ? 'Yes' : 'No'),
                 SizedBox(height: 16),
-                
                 Row(
                   children: [
                     Expanded(
@@ -318,7 +323,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
                     decoration: InputDecoration(labelText: 'Email'),
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Email is required';
-                      if (!value!.contains('@')) return 'Valid email is required';
+                      if (!value!.contains('@'))
+                        return 'Valid email is required';
                       return null;
                     },
                   ),
@@ -336,7 +342,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
                     obscureText: true,
                     validator: (value) {
                       if (value?.isEmpty ?? true) return 'Password is required';
-                      if (value!.length < 6) return 'Password must be at least 6 characters';
+                      if (value!.length < 6)
+                        return 'Password must be at least 6 characters';
                       return null;
                     },
                   ),
@@ -354,7 +361,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
                     value: _selectedGender,
                     decoration: InputDecoration(labelText: 'Gender'),
                     items: ['Male', 'Female'].map((gender) {
-                      return DropdownMenuItem(value: gender, child: Text(gender));
+                      return DropdownMenuItem(
+                          value: gender, child: Text(gender));
                     }).toList(),
                     onChanged: (value) {
                       _selectedGender = value!;
@@ -382,24 +390,25 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
-                  final success = await AdminService.createUser(
-                    email: _emailController.text.trim(),
-                    password: _passwordController.text,
-                    name: _nameController.text.trim(),
-                    username: _usernameController.text.trim(),
-                    age: int.tryParse(_ageController.text),
-                    weight: double.tryParse(_weightController.text),
-                    gender: _selectedGender,
-                    experience: _selectedExperience,
-                  );
+                  try {
+                    final result = await AdminService.createUserViaBackend(
+                      email: _emailController.text.trim(),
+                      password: _passwordController.text,
+                      name: _nameController.text.trim(),
+                      username: _usernameController.text.trim(),
+                      age: int.tryParse(_ageController.text),
+                      weight: double.tryParse(_weightController.text),
+                      gender: _selectedGender,
+                      experience: _selectedExperience,
+                    );
 
-                  Navigator.of(context).pop();
-                  
-                  if (success) {
+                    Navigator.of(context).pop();
                     _showSnackBar('User created successfully', Colors.green);
                     _loadUsers();
-                  } else {
-                    _showSnackBar('Failed to create user', Colors.red);
+                  } catch (e) {
+                    Navigator.of(context).pop();
+                    _showSnackBar(
+                        'Failed to create user: ${e.toString()}', Colors.red);
                   }
                 }
               },
@@ -413,10 +422,12 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
 
   void _showEditUserDialog(Map<String, dynamic> user) {
     final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController(text: user['name']);
+    final _nameController =
+        TextEditingController(text: user['displayName'] ?? user['name']);
     final _usernameController = TextEditingController(text: user['username']);
     final _ageController = TextEditingController(text: user['age']?.toString());
-    final _weightController = TextEditingController(text: user['weight']?.toString());
+    final _weightController =
+        TextEditingController(text: user['weight']?.toString());
     String _selectedGender = user['gender'] ?? 'Male';
     String _selectedExperience = user['experience'] ?? 'Beginner';
 
@@ -461,7 +472,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
                     value: _selectedGender,
                     decoration: InputDecoration(labelText: 'Gender'),
                     items: ['Male', 'Female'].map((gender) {
-                      return DropdownMenuItem(value: gender, child: Text(gender));
+                      return DropdownMenuItem(
+                          value: gender, child: Text(gender));
                     }).toList(),
                     onChanged: (value) {
                       _selectedGender = value!;
@@ -489,23 +501,29 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
-                  final success = await AdminService.updateUser(
-                    userId: user['uid'],
-                    name: _nameController.text.trim(),
-                    username: _usernameController.text.trim(),
-                    age: int.tryParse(_ageController.text),
-                    weight: double.tryParse(_weightController.text),
-                    gender: _selectedGender,
-                    experience: _selectedExperience,
-                  );
+                  try {
+                    final success = await AdminService.updateUserViaBackend(
+                      uid: user['uid'],
+                      name: _nameController.text.trim(),
+                      username: _usernameController.text.trim(),
+                      age: int.tryParse(_ageController.text),
+                      weight: double.tryParse(_weightController.text),
+                      gender: _selectedGender,
+                      experience: _selectedExperience,
+                    );
 
-                  Navigator.of(context).pop();
-                  
-                  if (success) {
-                    _showSnackBar('User updated successfully', Colors.green);
-                    _loadUsers();
-                  } else {
-                    _showSnackBar('Failed to update user', Colors.red);
+                    Navigator.of(context).pop();
+
+                    if (success) {
+                      _showSnackBar('User updated successfully', Colors.green);
+                      _loadUsers();
+                    } else {
+                      _showSnackBar('Failed to update user', Colors.red);
+                    }
+                  } catch (e) {
+                    Navigator.of(context).pop();
+                    _showSnackBar(
+                        'Failed to update user: ${e.toString()}', Colors.red);
                   }
                 }
               },
@@ -523,7 +541,8 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Delete User'),
-          content: Text('Are you sure you want to delete ${user['name']}? This action cannot be undone.'),
+          content: Text(
+              'Are you sure you want to delete ${user['displayName'] ?? user['name']}? This action cannot be undone.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -531,15 +550,22 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final success = await AdminService.deleteUser(user['uid']);
-                
-                Navigator.of(context).pop();
-                
-                if (success) {
-                  _showSnackBar('User deleted successfully', Colors.green);
-                  _loadUsers();
-                } else {
-                  _showSnackBar('Failed to delete user', Colors.red);
+                try {
+                  final success =
+                      await AdminService.deleteUserViaBackend(user['uid']);
+
+                  Navigator.of(context).pop();
+
+                  if (success) {
+                    _showSnackBar('User deleted successfully', Colors.green);
+                    _loadUsers();
+                  } else {
+                    _showSnackBar('Failed to delete user', Colors.red);
+                  }
+                } catch (e) {
+                  Navigator.of(context).pop();
+                  _showSnackBar(
+                      'Failed to delete user: ${e.toString()}', Colors.red);
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -550,4 +576,4 @@ class _AdminUserManagementState extends State<AdminUserManagement> {
       },
     );
   }
-} 
+}

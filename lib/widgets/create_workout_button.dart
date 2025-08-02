@@ -14,17 +14,7 @@ class CreateWorkoutButton extends StatelessWidget {
   }) : super(key: key);
 
   String _getCurrentDay() {
-    final now = DateTime.now();
-    final days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday'
-    ];
-    return days[now.weekday - 1]; // weekday returns 1-7, where 1 is Monday
+    return WorkoutService.getCurrentDay();
   }
 
   Future<void> _createWorkout(BuildContext context) async {

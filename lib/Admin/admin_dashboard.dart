@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin_auth.dart';
 import 'admin_service.dart';
 import 'admin_user_management.dart';
@@ -10,34 +9,73 @@ class AdminDashboard extends StatefulWidget {
   _AdminDashboardState createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> {
+class _AdminDashboardState extends State<AdminDashboard>
+    with TickerProviderStateMixin {
   bool _isLoading = true;
-  Map<String, dynamic> _analytics = {};
-  List<Map<String, dynamic>> _dailyActivity = [];
+  int _totalUsers = 0;
+  int _activeUsers = 0;
   List<Map<String, dynamic>> _recentUsers = [];
+  String _serverStatus = 'Unknown';
+  String _lastRefreshTime = 'Never';
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    print('AdminDashboard initState called');
+    _fadeController = AnimationController(
+      duration: Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+    _slideAnimation = Tween<Offset>(
+      begin: Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
     _loadDashboardData();
   }
 
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadDashboardData() async {
-    print('Loading dashboard data...');
     setState(() {
       _isLoading = true;
     });
-
     try {
+      print('🔄 Loading dashboard data...');
+
+      // Load data from Firebase
       await Future.wait([
-        _loadAnalytics(),
-        _loadDailyActivity(),
-        _loadRecentUsers(),
+        _loadAnalyticsFromFirebase(),
+        _loadRecentUsersFromFirebase(),
+        _loadServerStatus(),
       ]);
-      print('Dashboard data loaded successfully');
+
+      _fadeController.forward();
+      _slideController.forward();
+      print('✅ Dashboard data loaded successfully');
     } catch (e) {
-      print('Error loading dashboard data: $e');
+      print('❌ Error loading dashboard data: $e');
       _showSnackBar('Error loading dashboard data', Colors.red);
     } finally {
       setState(() {
@@ -46,41 +84,95 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Future<void> _loadAnalytics() async {
+  Future<void> _loadAnalyticsFromFirebase() async {
     try {
-      print('Loading user analytics...');
+      print('📊 Loading analytics from Firebase...');
+      final total = await AdminService.getTotalUsersFromStoredResponse();
+      final active = await AdminService.getActiveUsersFromStoredResponse();
 
-      // Get analytics using the stored count from admin document
-      final analytics = await AdminService.getUserAnalytics();
-      print('Analytics loaded - Total Users: ${analytics['totalUsers']}');
+      print('✅ Analytics loaded - Total: $total, Active: $active');
+
       setState(() {
-        _analytics = analytics;
+        _totalUsers = total;
+        _activeUsers = active;
       });
     } catch (e) {
-      print('Error loading analytics: $e');
+      print('❌ Error loading analytics from Firebase: $e');
       _showSnackBar('Error loading analytics data', Colors.red);
     }
   }
 
-  Future<void> _loadDailyActivity() async {
+  Future<void> _loadRecentUsersFromFirebase() async {
     try {
-      final activity = await AdminService.getDailyActivity();
+      print('📊 Loading recent users from Firebase...');
+      final users = await AdminService.getRecentUsersFromStoredResponse();
+
+      print('✅ Recent users loaded: ${users.length} users');
+
       setState(() {
-        _dailyActivity = activity;
+        _recentUsers = users.take(5).toList();
       });
     } catch (e) {
-      print('Error loading daily activity: $e');
+      print('❌ Error loading recent users from Firebase: $e');
+      _showSnackBar('Error loading recent users', Colors.red);
+    }
+  }
+
+  Future<void> _loadServerStatus() async {
+    try {
+      print('📊 Loading server status from Firebase...');
+      final status = await AdminService.getServerHealthStatus();
+      final lastRefresh = await AdminService.getLastRefreshTime();
+
+      print(
+          '✅ Server Status loaded - Status: $status, Last Refresh: $lastRefresh');
+
+      setState(() {
+        _serverStatus = status;
+        _lastRefreshTime = lastRefresh;
+      });
+    } catch (e) {
+      print('❌ Error loading server status from Firebase: $e');
+      _showSnackBar('Error loading server status', Colors.red);
+    }
+  }
+
+  Future<void> _loadAnalytics() async {
+    try {
+      print('🔄 Loading analytics data...');
+      print('📊 Calling getTotalUserCount()...');
+      final total = await AdminService.getTotalUserCount();
+      print('✅ Total users received: $total');
+
+      print('📊 Calling getActiveUsersCount()...');
+      final active = await AdminService.getActiveUsersCount();
+      print('✅ Active users received: $active');
+
+      setState(() {
+        _totalUsers = total;
+        _activeUsers = active;
+      });
+      print('✅ Analytics data loaded successfully');
+    } catch (e) {
+      print('❌ Error loading analytics data: $e');
+      _showSnackBar('Error loading analytics data', Colors.red);
     }
   }
 
   Future<void> _loadRecentUsers() async {
     try {
-      final users = await AdminService.getAllUsers();
+      print('🔄 Loading recent users...');
+      print('📊 Calling getAllUsersFromBackend()...');
+      final users = await AdminService.getAllUsersFromBackend();
+      print('✅ Recent users received: ${users.length} users');
+
       setState(() {
         _recentUsers = users.take(5).toList();
       });
+      print('✅ Recent users loaded successfully');
     } catch (e) {
-      print('Error loading recent users: $e');
+      print('❌ Error loading recent users: $e');
+      _showSnackBar('Error loading recent users', Colors.red);
     }
   }
 
@@ -90,70 +182,103 @@ class _AdminDashboardState extends State<AdminDashboard> {
         content: Text(message),
         backgroundColor: backgroundColor,
         duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 400;
+    final isMediumScreen = screenSize.width >= 400 && screenSize.width < 600;
+
     return Scaffold(
       backgroundColor: Color(0xFF1a1a1a),
       appBar: AppBar(
         backgroundColor: Color(0xFF33443c),
+        elevation: 0,
         title: Text(
           'Admin Dashboard',
           style: TextStyle(
             color: Colors.white,
             fontFamily: 'Poppins',
             fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 18 : 20,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadDashboardData,
-          ),
-          IconButton(
-            icon: Icon(Icons.logout, color: Colors.white),
+            icon: Icon(Icons.logout,
+                color: Colors.white, size: isSmallScreen ? 20 : 24),
             onPressed: () async {
               await AdminAuth.logoutAdmin();
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => LoginPage()),
               );
             },
+            tooltip: 'Logout',
           ),
         ],
       ),
       body: _isLoading
           ? Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Color(0xFF33443c)),
+                    strokeWidth: 3,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading dashboard...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             )
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome Section
-                  _buildWelcomeSection(),
-                  SizedBox(height: 24),
-
-                  // Analytics Cards
-                  _buildAnalyticsSection(),
-                  SizedBox(height: 24),
-
-                  // Quick Actions
-                  _buildQuickActionsSection(),
-                ],
+          : SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12 : 16,
+                      vertical: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildWelcomeSection(isSmallScreen),
+                        SizedBox(height: isSmallScreen ? 20 : 24),
+                        _buildAnalyticsSection(isSmallScreen, isMediumScreen),
+                        SizedBox(height: isSmallScreen ? 20 : 24),
+                        _buildQuickActionsSection(isSmallScreen),
+                        SizedBox(height: 20),
+                        _buildRecentUsersSection(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
     );
   }
 
-  Widget _buildWelcomeSection() {
+  Widget _buildWelcomeSection(bool isSmallScreen) {
     return Container(
-      padding: EdgeInsets.all(20),
+      width: double.infinity,
+      padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -177,15 +302,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Row(
             children: [
-              Icon(Icons.admin_panel_settings, color: Colors.white, size: 32),
-              SizedBox(width: 12),
-              Text(
-                'Welcome, Admin!',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
+              Icon(
+                Icons.admin_panel_settings,
+                color: Colors.white,
+                size: isSmallScreen ? 28 : 32,
+              ),
+              SizedBox(width: isSmallScreen ? 10 : 12),
+              Expanded(
+                child: Text(
+                  'Welcome, Admin!',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 20 : 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
             ],
@@ -194,7 +325,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Text(
             'Manage your ThatsFit application and monitor user activity',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: isSmallScreen ? 14 : 16,
               color: Colors.white.withOpacity(0.9),
               fontFamily: 'Poppins',
             ),
@@ -204,63 +335,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildAnalyticsSection() {
+  Widget _buildAnalyticsSection(bool isSmallScreen, bool isMediumScreen) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Analytics Overview',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontFamily: 'Poppins',
+            Expanded(
+              child: Text(
+                'Analytics Overview',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                ),
               ),
             ),
-            Row(
-              children: [
-                IconButton(
-                  icon: Icon(Icons.bug_report, color: Colors.orange),
-                  onPressed: () async {
-                    print('=== MANUAL DEBUG CHECK ===');
-                    await AdminService.testFirestoreAccess();
-                    final count =
-                        await AdminService.getTotalUserCountFromAuth();
-                    _showSnackBar('Debug: Found $count users in Firestore',
-                        Colors.orange);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.add_circle, color: Colors.green),
-                  onPressed: () async {
-                    print('=== SETTING INITIAL USER COUNT ===');
-                    await AdminService.setInitialUserCount(
-                        1); // Set to 1 for testing
-                    await _loadAnalytics(); // Refresh the display
-                    _showSnackBar('Set initial user count to 1', Colors.green);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.settings, color: Colors.purple),
-                  onPressed: () async {
-                    print('=== MANUAL USER COUNT SET ===');
-                    // Set a manual count for testing
-                    await AdminService.updateTotalUserCount(1);
-                    await _loadAnalytics(); // Refresh the display
-                    _showSnackBar('Manual count set to 1', Colors.purple);
-                  },
-                ),
-                IconButton(
-                  icon: Icon(Icons.refresh, color: Color(0xFF33443c)),
-                  onPressed: () {
-                    _loadAnalytics();
-                    _showSnackBar('Refreshing analytics...', Color(0xFF33443c));
-                  },
-                ),
-              ],
+            IconButton(
+              icon: Icon(Icons.refresh, color: Color(0xFF33443c), size: 20),
+              onPressed: _loadAnalytics,
+              tooltip: 'Refresh',
             ),
           ],
         ),
@@ -268,34 +364,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
         GridView.count(
           shrinkWrap: true,
           physics: NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 1.3,
+          crossAxisCount: isSmallScreen ? 1 : 2,
+          crossAxisSpacing: isSmallScreen ? 0 : 16,
+          mainAxisSpacing: isSmallScreen ? 12 : 16,
+          childAspectRatio: isSmallScreen ? 2.5 : (isMediumScreen ? 1.4 : 1.3),
           children: [
             _buildAnalyticsCard(
               'Total Users',
-              _analytics['totalUsers']?.toString() ?? '0',
+              _totalUsers.toString(),
               Icons.people,
               Color(0xFF33443c),
+              isSmallScreen,
             ),
             _buildAnalyticsCard(
               'Active Users',
-              _analytics['activeUsers']?.toString() ?? '0',
+              _activeUsers.toString(),
               Icons.person_add,
               Colors.blue,
-            ),
-            _buildAnalyticsCard(
-              'Completed Profiles',
-              _analytics['completedProfiles']?.toString() ?? '0',
-              Icons.check_circle,
-              Colors.green,
-            ),
-            _buildAnalyticsCard(
-              'Users with Workouts',
-              _analytics['usersWithWorkouts']?.toString() ?? '0',
-              Icons.fitness_center,
-              Colors.orange,
+              isSmallScreen,
             ),
           ],
         ),
@@ -303,10 +389,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildAnalyticsCard(
-      String title, String value, IconData icon, Color color) {
+  Widget _buildAnalyticsCard(String title, String value, IconData icon,
+      Color color, bool isSmallScreen) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
       decoration: BoxDecoration(
         color: Color(0xFF2d2d2d),
         borderRadius: BorderRadius.circular(12),
@@ -318,132 +404,235 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 24),
-              SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontFamily: 'Poppins',
+      child: isSmallScreen
+          ? Row(
+              children: [
+                Icon(icon, color: color, size: isSmallScreen ? 20 : 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 12 : 14,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 18 : 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                      if (title == 'Total Users' && value == '0' && !_isLoading)
+                        Text(
+                          'No users registered yet',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 8,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Poppins',
-            ),
-          ),
-          if (title == 'Total Users' && value == '0' && !_isLoading)
-            Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'No users registered yet',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 10,
-                  fontFamily: 'Poppins',
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: color, size: 24),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontFamily: 'Poppins',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                SizedBox(height: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                if (title == 'Total Users' && value == '0' && !_isLoading)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'No users registered yet',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 10,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
-  Widget _buildQuickActionsSection() {
+  Widget _buildQuickActionsSection(bool isSmallScreen) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Quick Actions',
           style: TextStyle(
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18 : 20,
             fontWeight: FontWeight.bold,
             color: Colors.white,
             fontFamily: 'Poppins',
           ),
         ),
         SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                'Add User',
-                Icons.person_add,
-                Color(0xFF33443c),
-                () => _showAddUserDialog(),
+        _buildActionCard(
+          'User Management',
+          Icons.people,
+          Colors.blue,
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AdminUserManagement(),
               ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: _buildActionCard(
-                'User Management',
-                Icons.people,
-                Colors.blue,
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AdminUserManagement(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            );
+          },
+          isSmallScreen,
         ),
       ],
     );
   }
 
-  Widget _buildActionCard(
-      String title, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Color(0xFF2d2d2d),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
+  Widget _buildActionCard(String title, IconData icon, Color color,
+      VoidCallback onTap, bool isSmallScreen) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+          decoration: BoxDecoration(
+            color: Color(0xFF2d2d2d),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: isSmallScreen ? 28 : 32,
               ),
-            ),
-          ],
+              SizedBox(height: isSmallScreen ? 6 : 8),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 14 : 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showAddUserDialog() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AdminUserManagement(),
-      ),
+  Widget _buildRecentUsersSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Recent Users',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        SizedBox(height: 12),
+        _recentUsers.isEmpty
+            ? Text(
+                'No recent users found.',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                ),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: _recentUsers.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: Colors.grey[700],
+                  height: 1,
+                ),
+                itemBuilder: (context, index) {
+                  final user = _recentUsers[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Color(0xFF33443c),
+                      child: Icon(Icons.person, color: Colors.white),
+                    ),
+                    title: Text(
+                      user['name'] ?? 'Unknown',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      user['email'] ?? '',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                      ),
+                    ),
+                    trailing: Text(
+                      user['createdAt'] != null
+                          ? user['createdAt'].toString().substring(0, 10)
+                          : '',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ],
     );
   }
 }

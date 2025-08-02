@@ -79,14 +79,14 @@ class _LoginPageState extends State<LoginPage>
       print('Attempting login with email: ${_emailController.text.trim()}');
 
       // Check if this is an admin login
-      if (_emailController.text.trim() == 'thatsfitAdmin@gmail.com' && 
+      if (_emailController.text.trim() == 'thatsfitAdmin@gmail.com' &&
           _passwordController.text.trim() == 'thatsfitAdmin') {
         print('Admin login detected');
-        
+
         try {
           // Login as admin
           final success = await AdminAuth.loginAsAdmin();
-          
+
           if (success) {
             print('Admin login successful');
             print('Navigating to AdminDashboard...');
@@ -102,7 +102,9 @@ class _LoginPageState extends State<LoginPage>
           } else {
             print('Admin login failed');
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Admin login failed. Please check credentials.')),
+              SnackBar(
+                  content:
+                      Text('Admin login failed. Please check credentials.')),
             );
             setState(() => _isLoading = false);
             return;
@@ -402,24 +404,6 @@ class _LoginPageState extends State<LoginPage>
                                         }
                                         return null;
                                       },
-                                    ),
-                                    SizedBox(height: 10),
-                                    // Forgot password
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton(
-                                        onPressed: () {
-                                          // Handle forgot password
-                                        },
-                                        child: Text(
-                                          'Forgot Password?',
-                                          style: TextStyle(
-                                            color: Color(0xFF6e9277),
-                                            fontFamily: 'Inter',
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
                                     ),
                                     SizedBox(height: 20),
                                     // Sign in button

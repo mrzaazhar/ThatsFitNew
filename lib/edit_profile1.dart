@@ -12,7 +12,6 @@ class EditProfile1 extends StatefulWidget {
 class _EditProfile1State extends State<EditProfile1> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
@@ -40,7 +39,6 @@ class _EditProfile1State extends State<EditProfile1> {
           setState(() {
             _nameController.text = profileData['name'] ?? '';
             _usernameController.text = profileData['username'] ?? '';
-            _emailController.text = user.email ?? '';
           });
         }
       }
@@ -53,7 +51,6 @@ class _EditProfile1State extends State<EditProfile1> {
   void dispose() {
     _nameController.dispose();
     _usernameController.dispose();
-    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -98,19 +95,9 @@ class _EditProfile1State extends State<EditProfile1> {
   }
 
   Future<void> _saveProfile(BuildContext context) async {
-    if (_nameController.text.isEmpty ||
-        _usernameController.text.isEmpty ||
-        _emailController.text.isEmpty) {
+    if (_nameController.text.isEmpty || _usernameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill in all required fields')),
-      );
-      return;
-    }
-
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(_emailController.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter a valid email address')),
       );
       return;
     }
@@ -122,12 +109,6 @@ class _EditProfile1State extends State<EditProfile1> {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // If email is being changed, send verification link
-        if (_emailController.text.trim() != user.email) {
-          await _sendSignInLink(_emailController.text.trim());
-          return;
-        }
-
         // Update password if provided
         if (_passwordController.text.isNotEmpty) {
           if (_passwordController.text.length < 6) {
@@ -221,17 +202,11 @@ class _EditProfile1State extends State<EditProfile1> {
     final isSmallScreen = screenSize.width < 360;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1A1A1A),
-              Color(0xFF000000),
-            ],
-          ),
-        ),
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -265,7 +240,7 @@ class _EditProfile1State extends State<EditProfile1> {
                   margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   padding: EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
@@ -315,13 +290,6 @@ class _EditProfile1State extends State<EditProfile1> {
                       SizedBox(height: 30),
 
                       // Form Fields
-                      _buildTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      SizedBox(height: 16),
                       _buildTextField(
                         controller: _passwordController,
                         label: 'Password',
@@ -397,7 +365,7 @@ class _EditProfile1State extends State<EditProfile1> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
