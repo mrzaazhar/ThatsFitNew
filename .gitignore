@@ -63,4 +63,7 @@ lib/firebase_options.dart
 lib/services/youtube_service.dart
 *.env
 
-lib/admin/admin_service.dart
+lib/Admin/admin_service.dart
+lib/Admin/admin_auth.dart
+lib/Admin/admin_dashboard.dart
+lib/Admin/admin_user_management.dart
