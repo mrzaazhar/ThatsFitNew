@@ -45,7 +45,12 @@ app.*.map.json
 /android/app/release
 
 # Ignore Firebase Admin SDK service account key
-backend/serviceAccountKeyNew.json
+backend/admin
+*serviceAccountKey.json
+
+#Ignore Flowise service account key
+backend/flowise
+*serviceAccountKeyNew.json
 
 # Firebase credentials
 .env
@@ -57,3 +62,5 @@ lib/firebase_options.dart
 # YouTube API keys and sensitive files
 lib/services/youtube_service.dart
 *.env
+
+lib/admin/admin_service.dart
