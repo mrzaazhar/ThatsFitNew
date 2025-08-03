@@ -24,14 +24,6 @@ A comprehensive Flutter-based fitness application that helps users track their w
 - **Analytics Dashboard**: Real-time user statistics and activity monitoring
 - **System Monitoring**: Track user engagement and fitness metrics
 
-## 📱 Screenshots
-
-*[login.jpg]*
-*[image.png]*
-*[image.png]*
-*[image.png]*
-*[image.png]*
-
 ## 🛠️ Technology Stack
 
 - **Frontend**: Flutter 3.2.3+
@@ -130,11 +122,6 @@ lib/
 ```
 
 ## 🔐 Admin Access
-
-### Admin Credentials
-- **Email**: `thatsfitAdmin@gmail.com`
-- **Password**: `thatsfitAdmin`
-- **Admin ID**: `71N1ZTeAUol0zHf2ZCiI`
 
 ### Admin Features
 - User management (add, edit, delete users)
@@ -254,7 +241,6 @@ For support and questions:
 - Health Connect integration
 - Admin dashboard
 - Smart notifications
-- Cross-platform support
 
 ---
 
