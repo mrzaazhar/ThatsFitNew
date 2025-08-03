@@ -64,3 +64,5 @@ lib/services/youtube_service.dart
 *.env
 
 lib/Admin
+backend/admin
+backend/flowise
