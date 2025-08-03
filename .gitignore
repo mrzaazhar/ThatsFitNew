@@ -65,6 +65,78 @@ lib/firebase_options.dart
 lib/services/youtube_service.dart
 *.env
 
-lib/Admin
-backend/admin
-backend/flowise
+# Additional security files to ignore
+# Google Services configuration (contains API keys)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Firebase configuration files
+firebase_options.dart
+firebase_options.dart.bak
+
+# Environment and configuration files
+.env.local
+.env.production
+.env.development
+.env.staging
+
+# API key files
+api_keys.dart
+secrets.dart
+config.dart
+
+# Database credentials
+database_config.dart
+db_credentials.json
+
+# Payment processing keys
+stripe_keys.dart
+paypal_config.dart
+
+# Social media API keys
+facebook_config.dart
+google_config.dart
+twitter_config.dart
+
+# Analytics and tracking keys
+analytics_config.dart
+tracking_keys.dart
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Log files
+*.log
+logs/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Node.js (for backend functions)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Test files (optional - remove if you want to track tests)
+test_coverage/
+.coverage

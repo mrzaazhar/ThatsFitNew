@@ -26,7 +26,7 @@ A comprehensive Flutter-based fitness application that helps users track their w
 
 ## 📱 Screenshots
 
-*[image.png]*
+*[login.jpg]*
 *[image.png]*
 *[image.png]*
 *[image.png]*
