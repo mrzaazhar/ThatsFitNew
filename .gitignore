@@ -45,8 +45,10 @@ app.*.map.json
 /android/app/release
 
 # Ignore Firebase Admin SDK service account key
-backend/admin
+backend/admin/
 *serviceAccountKey.json
+backend/admin/serviceAccountKey.json
+!backend/admin/serviceAccountKey.template.json
 
 #Ignore Flowise service account key
 backend/flowise
