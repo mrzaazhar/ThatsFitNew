@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'edit_profile1.dart';
-import 'delete_profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'edit_profile1.dart';
+import 'delete_profile.dart';
 import 'main.dart';
+import 'setup_profile.dart';
 
 class ProfilePage extends StatefulWidget {
   @override
@@ -19,12 +20,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   String _username = 'Loading...';
   String? _profileImageUrl;
+  bool _isProfileCompleted = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _checkProfileCompletion();
   }
 
   Future<void> _loadUserData() async {
@@ -62,6 +65,40 @@ class _ProfilePageState extends State<ProfilePage> {
       print('Error loading user data: $e');
       setState(() {
         _username = 'User';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _checkProfileCompletion() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() ?? {};
+          setState(() {
+            _isProfileCompleted = userData['profileCompleted'] ?? false;
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _isProfileCompleted = false;
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error checking profile completion: $e');
+      setState(() {
         _isLoading = false;
       });
     }
@@ -303,6 +340,73 @@ class _ProfilePageState extends State<ProfilePage> {
                   ],
                 ),
               ),
+              // Profile Completion Banner
+              if (!_isProfileCompleted && !_isLoading)
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Complete Your Profile',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Set up your fitness profile to unlock all features',
+                              style: TextStyle(
+                                color: Colors.orange.withOpacity(0.8),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => SetupProfilePage()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: Text(
+                          'Setup',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // Main Content
               Expanded(
                 child: SingleChildScrollView(
@@ -458,49 +562,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                     Icons.logout,
                                     'Logout',
                                     () => _showLogoutDialog(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 30),
-                        Align(
-                          alignment: Alignment.topLeft,
-                          child: Text(
-                            'About Us',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          child: Card(
-                            color: Color(0xFF2d2d2d),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 8,
-                            child: Padding(
-                              padding: EdgeInsets.all(20),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  _buildProfileOption(
-                                    Icons.info,
-                                    'Instagram',
-                                    () {},
-                                  ),
-                                  SizedBox(height: 16),
-                                  _buildProfileOption(
-                                    Icons.info,
-                                    'Tiktok',
-                                    () {},
                                   ),
                                 ],
                               ),

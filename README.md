@@ -14,7 +14,7 @@ A comprehensive Flutter-based fitness application that helps users track their w
 
 ### Advanced Features
 - **Health Connect Integration**: Sync with Samsung Health and Galaxy Fit 3
-- **Smart Notifications**: Intelligent workout reminders and scheduling
+
 - **Admin Dashboard**: Comprehensive admin system for user management
 - **Firebase Backend**: Real-time data synchronization
 - **Cross-Platform**: Support for Android, iOS, Web, Windows, macOS, and Linux
@@ -137,11 +137,6 @@ lib/
 - Automatic daily step goal monitoring
 - Health data visualization
 
-### Smart Notifications
-- Workout reminders (1 hour, 30 minutes, and at workout time)
-- Daily step goal notifications
-- Weekly progress updates
-- Customizable notification settings
 
 ### Workout Management
 - Create custom workouts with specific exercises
@@ -233,14 +228,12 @@ For support and questions:
 - Check the documentation files in the project
 - Review Firebase setup guides
 - Ensure Health Connect is properly configured
-- Verify notification permissions are granted
 
 ## 🔄 Version History
 
 - **v1.0.0**: Initial release with core fitness tracking features
 - Health Connect integration
 - Admin dashboard
-- Smart notifications
 
 ---
 

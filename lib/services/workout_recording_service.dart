@@ -35,7 +35,7 @@ class WorkoutRecordingService {
 
       await _updateWeeklyProgress();
 
-      // Check goals and send notifications
+      // Check goals progress (notification functionality removed)
       await GoalCheckService.checkGoalsAndNotify();
 
       print('Workout recorded successfully: $workoutName');

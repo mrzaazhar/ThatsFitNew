@@ -84,14 +84,16 @@ class CreateWorkoutButton extends StatelessWidget {
 
       if (context.mounted) {
         String errorMessage = 'Error creating workout: $e';
-        
+
         // Provide more helpful error messages
         if (e.toString().contains('User profile not found')) {
-          errorMessage = 'Please complete your profile setup first. Go to Profile > Edit Profile to set up your fitness information.';
+          errorMessage =
+              'Profile setup required! Please complete your profile first. Go to Profile tab > Edit Profile to set up your fitness information (age, weight, gender, experience level).';
         } else if (e.toString().contains('Cannot connect to server')) {
-          errorMessage = 'Cannot connect to server. Please check your internet connection and try again.';
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),

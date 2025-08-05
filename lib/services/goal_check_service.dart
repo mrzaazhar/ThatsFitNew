@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'workout_recording_service.dart';
-import 'notification_service.dart';
 
 class GoalCheckService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,20 +23,16 @@ class GoalCheckService {
 
       // Check if user is behind schedule
       if (isBehindOnWorkouts && workoutGoal > 0) {
-        NotificationService.showBehindScheduleNotification(
-          focusBodyPart: focusBodyPart,
-          completedWorkouts: completedWorkouts,
-          workoutGoal: workoutGoal,
-        );
+        print(
+            'User is behind schedule - Focus: $focusBodyPart, Completed: $completedWorkouts/$workoutGoal');
+        // Notification functionality removed
       }
 
       // Check if user achieved their goal
       if (completedWorkouts >= workoutGoal && workoutGoal > 0) {
-        NotificationService.showGoalAchievementNotification(
-          goalType: 'workout',
-          achieved: completedWorkouts,
-          goal: workoutGoal,
-        );
+        print(
+            'Goal achieved! Workout goal: $completedWorkouts/$workoutGoal completed');
+        // Notification functionality removed
       }
     } catch (e) {
       print('Error checking goal progress: $e');
@@ -186,7 +181,7 @@ class GoalCheckService {
     }
   }
 
-  /// Check goals and send notifications automatically
+  /// Check goals progress automatically (notification functionality removed)
   static Future<void> checkGoalsAndNotify() async {
     try {
       final progress = await WorkoutRecordingService.checkGoalProgress();
@@ -200,20 +195,16 @@ class GoalCheckService {
 
       // Check if user is behind schedule
       if (isBehindOnWorkouts && workoutGoal > 0) {
-        await NotificationService.showBehindScheduleNotification(
-          focusBodyPart: focusBodyPart,
-          completedWorkouts: completedWorkouts,
-          workoutGoal: workoutGoal,
-        );
+        print(
+            'User is behind schedule - Focus: $focusBodyPart, Completed: $completedWorkouts/$workoutGoal');
+        // Notification functionality removed
       }
 
       // Check if user achieved their goal
       if (completedWorkouts >= workoutGoal && workoutGoal > 0) {
-        await NotificationService.showGoalAchievementNotification(
-          goalType: 'workout',
-          achieved: completedWorkouts,
-          goal: workoutGoal,
-        );
+        print(
+            'Goal achieved! Workout goal: $completedWorkouts/$workoutGoal completed');
+        // Notification functionality removed
       }
     } catch (e) {
       print('Error checking goal progress: $e');

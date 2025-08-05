@@ -10,7 +10,7 @@ class AdminService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   // Backend server configuration
-  static const String baseUrl = 'http://192.168.0.171:3002/api/admin';
+  static const String baseUrl = 'http://159.89.196.39:3002/api/admin';
 
   /// Get all users from backend server
   static Future<List<Map<String, dynamic>>> getAllUsersFromBackend() async {

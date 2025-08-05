@@ -258,30 +258,28 @@ class DeleteProfilePage extends StatelessWidget {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Delete user data from Firestore
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .delete();
+        // Delete all user data from Firestore including subcollections
+        await _deleteAllUserData(user.uid);
+
+        // Sign out the user first to ensure they're logged out
+        await FirebaseAuth.instance.signOut();
 
         // Delete user account from Firebase Auth
         await user.delete();
-
-        // Sign out the user
-        await FirebaseAuth.instance.signOut();
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Account deleted successfully. Please create a new account to access ThatsFit.',
+              'Account deleted successfully. You have been signed out.',
             ),
-            duration: Duration(seconds: 5),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
           ),
         );
 
         // Add a small delay to ensure the snackbar is shown before navigation
-        await Future.delayed(Duration(milliseconds: 500));
+        await Future.delayed(Duration(milliseconds: 1000));
 
         // Navigate to login page and clear all previous routes
         Navigator.pushAndRemoveUntil(
@@ -310,9 +308,20 @@ class DeleteProfilePage extends StatelessWidget {
       String message = 'Error deleting account';
       if (e.code == 'requires-recent-login') {
         message = 'Please sign in again before deleting your account';
-        // Even if there's an error, redirect to login page after showing error
+
+        // Sign out the user anyway for security
+        try {
+          await FirebaseAuth.instance.signOut();
+        } catch (signOutError) {
+          print('Error signing out: $signOutError');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
         );
 
         await Future.delayed(Duration(milliseconds: 2000));
@@ -324,14 +333,22 @@ class DeleteProfilePage extends StatelessWidget {
         );
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
+
+      // For any other auth error, sign out and redirect
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (signOutError) {
+        print('Error signing out: $signOutError');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting account: ${e.toString()}')),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
       );
-      // Even if there's an error, redirect to login page after showing error
+
       await Future.delayed(Duration(milliseconds: 2000));
 
       Navigator.pushAndRemoveUntil(
@@ -339,6 +356,69 @@ class DeleteProfilePage extends StatelessWidget {
         MaterialPageRoute(builder: (context) => LoginPage()),
         (route) => false,
       );
+    } catch (e) {
+      // For any other error, still sign out and redirect
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (signOutError) {
+        print('Error signing out: $signOutError');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting account. You have been signed out.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      await Future.delayed(Duration(milliseconds: 2000));
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+        (route) => false,
+      );
+    }
+  }
+
+  Future<void> _deleteAllUserData(String userId) async {
+    try {
+      final userDocRef =
+          FirebaseFirestore.instance.collection('users').doc(userId);
+
+      // Delete all subcollections
+      final subcollections = [
+        'profile',
+        'workout_history',
+        'chosen_workouts',
+        'Weekly_Goals'
+      ];
+
+      for (String subcollection in subcollections) {
+        final subcollectionRef = userDocRef.collection(subcollection);
+        final snapshot = await subcollectionRef.get();
+
+        for (QueryDocumentSnapshot doc in snapshot.docs) {
+          await doc.reference.delete();
+        }
+      }
+
+      // Finally delete the main user document
+      await userDocRef.delete();
+
+      print('All user data deleted successfully');
+    } catch (e) {
+      print('Error deleting user data: $e');
+      // Still attempt to delete main document if subcollection deletion fails
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .delete();
+      } catch (mainDocError) {
+        print('Error deleting main user document: $mainDocError');
+      }
     }
   }
 }

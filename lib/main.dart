@@ -6,16 +6,13 @@ import 'package:flutter_application_1/homepage.dart';
 import 'firebase_options.dart';
 import 'signup_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_application_1/services/notification_service.dart';
 import 'admin/admin_auth.dart';
 import 'admin/admin_dashboard.dart';
+import 'setup_profile.dart'; // Added import for SetupProfilePage
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-
-  // Initialize notification service
-  await NotificationService.initialize();
 
   runApp(const MyApp());
 }
@@ -146,12 +143,47 @@ class _LoginPageState extends State<LoginPage>
           MaterialPageRoute(builder: (context) => SignUpPage()),
         );
       } else {
-        print('User document found, navigating to home page');
-        // Navigate to home page after successful login
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
+        print('User document found, checking profile completion...');
+
+        // Check if user has completed profile setup
+        final userData = userDoc.data() ?? {};
+        final profileCompleted = userData['profileCompleted'] ?? false;
+
+        // For existing users, automatically mark profile as completed if missing
+        if (!profileCompleted) {
+          print('Profile not completed, checking if user has basic info...');
+
+          // Check if user has email (basic requirement)
+          if (userData['email'] != null) {
+            print('Existing user found, marking profile as completed...');
+            // Update user document to mark profile as completed
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userCredential.user!.uid)
+                .update({'profileCompleted': true});
+
+            print('Profile marked as completed, navigating to home page');
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          } else {
+            print(
+                'New user without basic info, redirecting to profile setup...');
+            // Redirect to profile setup for truly new users
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => SetupProfilePage()),
+            );
+          }
+        } else {
+          print('Profile completed, navigating to home page');
+          // Navigate to home page after successful login
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage()),
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       print('Firebase Auth Exception: ${e.code} - ${e.message}');

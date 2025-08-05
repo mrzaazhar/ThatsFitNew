@@ -156,17 +156,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final isSmallScreen = screenSize.width < 360;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1A1A1A),
-              Color(0xFF000000),
-            ],
-          ),
-        ),
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.black,
         child: SafeArea(
           child: SingleChildScrollView(
             child: Column(
@@ -200,13 +194,55 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   margin: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   padding: EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Profile Picture Section (Optional)
+                      Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF6e9277).withOpacity(0.2),
+                                border: Border.all(
+                                  color: Color(0xFF6e9277),
+                                  width: 2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.person,
+                                size: 50,
+                                color: Color(0xFF6e9277),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF6e9277),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.camera_alt,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 30),
+
                       // Form Fields
                       _buildTextField(
                         controller: _ageController,
@@ -290,7 +326,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
@@ -321,7 +357,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.black,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
@@ -329,9 +365,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          dropdownColor: Color(0xFF1A1A1A),
-          icon: Icon(Icons.arrow_drop_down, color: Color(0xFF6e9277)),
-          style: TextStyle(color: Colors.white, fontFamily: 'Poppins'),
+          dropdownColor: Colors.black,
+          icon: Icon(
+            Icons.arrow_drop_down,
+            color: Color(0xFF6e9277),
+          ),
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'Poppins',
+          ),
           items: items.map((String item) {
             return DropdownMenuItem<String>(
               value: item,
@@ -339,9 +381,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    Icon(icon, color: Color(0xFF6e9277), size: 20),
+                    Icon(
+                      icon,
+                      color: Color(0xFF6e9277),
+                    ),
                     SizedBox(width: 12),
-                    Text(item),
+                    Expanded(
+                      child: Text(item),
+                    ),
                   ],
                 ),
               ),

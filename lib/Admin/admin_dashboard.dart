@@ -377,7 +377,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               isSmallScreen,
             ),
             _buildAnalyticsCard(
-              'Active Users',
+              'ThatsFit Active Users',
               _activeUsers.toString(),
               Icons.person_add,
               Colors.blue,

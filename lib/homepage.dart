@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
 import 'profile_page.dart';
-import 'main.dart';
 import 'step_count.dart';
 import 'workout.dart';
 import 'saved_workout.dart';
 import 'weekly_goals.dart';
-import 'widgets/create_workout_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'services/health_connect_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'services/workout_service.dart';
+import 'setup_profile.dart';
+import 'workout_statistics.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -20,15 +20,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0; // Track the selected index
-  int _current = 0; // Track current carousel page
   final int dailyGoal = 10000;
   late HealthConnectService _healthConnectService;
-  DateTime? _lastResetDate;
   int _currentSteps = 0; // Add this to track current steps
   bool _isLoadingSteps = true; // Add loading state
 
-  // List of widgets for each tab
-  late final List<Widget> _widgetOptions;
+  // Page controller for sliding cards
+  PageController _cardPageController = PageController();
+  int _currentCardIndex = 0;
 
   @override
   void initState() {
@@ -38,20 +37,9 @@ class _HomePageState extends State<HomePage> {
       _loadInitialSteps(); // Load initial steps from Firebase
       _initHealthConnect();
     });
-    _widgetOptions = <Widget>[
-      // Home Screen - Current page content
-      _buildHomeContent(),
-      // Weekly Goals Screen
-      WeeklyGoalsPage(),
-      // Saved Workouts Screen
-      SavedWorkoutPage(),
-      // Profile Screen
-      ProfilePage(),
-    ];
-  }
 
-  Widget _buildHomeContent() {
-    return Container(); // This will be replaced with the actual home content
+    // Check profile completion on app start
+    _checkProfileCompletion();
   }
 
   // Add method to load initial steps from Firebase
@@ -110,6 +98,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _healthConnectService.dispose();
+    _cardPageController.dispose();
     super.dispose();
   }
 
@@ -117,7 +106,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _selectedIndex = index; // Update the selected index
     });
-    
+
     // Navigate to different pages based on index
     if (index == 1) {
       Navigator.push(
@@ -140,8 +129,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final userId = user?.uid;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -239,124 +226,58 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                      // Step Count Card
-                      Card(
-                        color: Color(0xFF232323),
-                        elevation: 6,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(18.0),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Step Count',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Poppins',
-                                  color: Colors.white,
+                      // Sliding Cards (Step Count & Statistics)
+                      Container(
+                        height: 200,
+                        child: Column(
+                          children: [
+                            // Page Indicators
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  margin: EdgeInsets.symmetric(horizontal: 4),
+                                  height: 8,
+                                  width: _currentCardIndex == 0 ? 24 : 8,
+                                  decoration: BoxDecoration(
+                                    color: _currentCardIndex == 0
+                                        ? Color(0xFF6e9277)
+                                        : Colors.white.withOpacity(0.4),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                Container(
+                                  margin: EdgeInsets.symmetric(horizontal: 4),
+                                  height: 8,
+                                  width: _currentCardIndex == 1 ? 24 : 8,
+                                  decoration: BoxDecoration(
+                                    color: _currentCardIndex == 1
+                                        ? Color(0xFF6e9277)
+                                        : Colors.white.withOpacity(0.4),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            // Sliding Cards
+                            Expanded(
+                              child: PageView(
+                                controller: _cardPageController,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _currentCardIndex = index;
+                                  });
+                                },
                                 children: [
-                                  _isLoadingSteps
-                                      ? SizedBox(
-                                          width: 70,
-                                          height: 70,
-                                          child: CircularProgressIndicator(
-                                            backgroundColor: Colors.grey[800],
-                                            valueColor:
-                                                AlwaysStoppedAnimation<Color>(
-                                              Color(0xFF6e9277),
-                                            ),
-                                            strokeWidth: 8,
-                                          ),
-                                        )
-                                      : TweenAnimationBuilder<double>(
-                                          tween: Tween<double>(
-                                            begin: 0,
-                                            end: steps / dailyGoal,
-                                          ),
-                                          duration: Duration(milliseconds: 800),
-                                          builder: (context, value, child) {
-                                            return SizedBox(
-                                              width: 70,
-                                              height: 70,
-                                              child: CircularProgressIndicator(
-                                                value: value,
-                                                backgroundColor:
-                                                    Colors.grey[800],
-                                                valueColor:
-                                                    AlwaysStoppedAnimation<
-                                                        Color>(
-                                                  Color(0xFF6e9277),
-                                                ),
-                                                strokeWidth: 8,
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                  SizedBox(width: 18),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _isLoadingSteps ? '...' : '$steps',
-                                        style: TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          fontFamily: 'Poppins',
-                                        ),
-                                      ),
-                                      Text(
-                                        'steps',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.white70,
-                                          fontFamily: 'Inter',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(width: 18),
-                                  OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      side:
-                                          BorderSide(color: Color(0xFF6e9277)),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      backgroundColor: Colors.transparent,
-                                    ),
-                                    onPressed: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => StepCountPage(),
-                                        ),
-                                      );
-                                      // Refresh steps when returning from step count page
-                                      _loadInitialSteps();
-                                    },
-                                    child: Text(
-                                      'View More',
-                                      style: TextStyle(
-                                        color: Color(0xFF6e9277),
-                                        fontFamily: 'Inter',
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
+                                  // Step Count Card
+                                  _buildStepCountCard(steps),
+                                  // Statistics Card
+                                  _buildStatisticsCard(),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                       SizedBox(height: 18),
@@ -950,6 +871,213 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // Build Step Count Card
+  Widget _buildStepCountCard(int steps) {
+    return Card(
+      color: Color(0xFF232323),
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18.0),
+        child: Column(
+          children: [
+            Text(
+              'Step Count',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _isLoadingSteps
+                    ? SizedBox(
+                        width: 70,
+                        height: 70,
+                        child: CircularProgressIndicator(
+                          backgroundColor: Colors.grey[800],
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color(0xFF6e9277),
+                          ),
+                          strokeWidth: 8,
+                        ),
+                      )
+                    : TweenAnimationBuilder<double>(
+                        tween: Tween<double>(
+                          begin: 0,
+                          end: steps / dailyGoal,
+                        ),
+                        duration: Duration(milliseconds: 800),
+                        builder: (context, value, child) {
+                          return SizedBox(
+                            width: 70,
+                            height: 70,
+                            child: CircularProgressIndicator(
+                              value: value,
+                              backgroundColor: Colors.grey[800],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF6e9277),
+                              ),
+                              strokeWidth: 8,
+                            ),
+                          );
+                        },
+                      ),
+                SizedBox(width: 18),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isLoadingSteps ? '...' : '$steps',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    Text(
+                      'steps',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(width: 18),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: Color(0xFF6e9277)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    backgroundColor: Colors.transparent,
+                  ),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StepCountPage(),
+                      ),
+                    );
+                    // Refresh steps when returning from step count page
+                    _loadInitialSteps();
+                  },
+                  child: Text(
+                    'View More',
+                    style: TextStyle(
+                      color: Color(0xFF6e9277),
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Build Statistics Card
+  Widget _buildStatisticsCard() {
+    return Card(
+      color: Color(0xFF232323),
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => WorkoutHistoryPage(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
+            children: [
+              Text(
+                'Workout Statistics',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Poppins',
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF6e9277).withOpacity(0.2),
+                      border: Border.all(
+                        color: Color(0xFF6e9277),
+                        width: 3,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.analytics,
+                      color: Color(0xFF6e9277),
+                      size: 28,
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Body Parts',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        Text(
+                          'tracked',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white70,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white.withOpacity(0.6),
+                    size: 18,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _checkAndResetDailySteps() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -978,16 +1106,62 @@ class _HomePageState extends State<HomePage> {
             'lastResetDate': FieldValue.serverTimestamp(),
             'weeklySteps': currentWeeklyTotal,
           });
-
-          setState(() {
-            _lastResetDate = now;
-          });
-        } else {
-          setState(() {
-            _lastResetDate = lastResetDate;
-          });
         }
       }
+    }
+  }
+
+  // Check if user has completed profile setup
+  Future<void> _checkProfileCompletion() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() ?? {};
+          final profileCompleted = userData['profileCompleted'] ?? false;
+
+          if (!profileCompleted && mounted) {
+            // Show dialog to complete profile setup
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Complete Your Profile'),
+                  content: Text(
+                      'Please complete your profile setup to use all features of the app.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => SetupProfilePage()),
+                        );
+                      },
+                      child: Text('Complete Profile'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text('Later'),
+                    ),
+                  ],
+                );
+              },
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking profile completion: $e');
     }
   }
 }
