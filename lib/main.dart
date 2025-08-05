@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/homepage.dart';
-import 'firebase_options.dart';
 import 'signup_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin/admin_auth.dart';
@@ -24,9 +22,117 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Login Page',
+      title: 'ThatsFit',
       theme: ThemeData(primarySwatch: Colors.green),
-      home: LoginPage(),
+      home: AuthWrapper(), // Use AuthWrapper instead of LoginPage directly
+    );
+  }
+}
+
+// Auth wrapper to handle authentication state changes
+class AuthWrapper extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        print('Auth state changed: ${snapshot.data?.uid ?? 'No user'}');
+
+        // Show loading indicator while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF1A1A1A),
+                    Color(0xFF000000),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // If user is logged in, check profile completion and navigate accordingly
+        if (snapshot.hasData && snapshot.data != null) {
+          return FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .doc(snapshot.data!.uid)
+                .get(),
+            builder: (context, userSnapshot) {
+              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                return Scaffold(
+                  backgroundColor: Colors.black,
+                  body: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0xFF1A1A1A),
+                          Color(0xFF000000),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF6e9277)),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // Check if user document exists and profile is completed
+              if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                final userData =
+                    userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+                final profileCompleted = userData['profileCompleted'] ?? false;
+
+                if (profileCompleted) {
+                  // User is authenticated and profile is complete, show home page
+                  return HomePage();
+                } else {
+                  // User is authenticated but profile is not complete, show setup
+                  return SetupProfilePage();
+                }
+              } else {
+                // User document doesn't exist, redirect to login
+                return LoginPage();
+              }
+            },
+          );
+        }
+
+        // If no user is logged in, show login page
+        return LoginPage();
+      },
     );
   }
 }

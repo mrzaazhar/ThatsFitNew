@@ -108,7 +108,6 @@ lib/
 ├── signup_page.dart          # User registration
 ├── setup_profile.dart        # Initial profile setup
 ├── edit_profile1.dart        # Profile editing
-├── delete_profile.dart       # Account deletion
 ├── Admin/                    # Admin system files
 │   ├── admin_auth.dart
 │   ├── admin_dashboard.dart

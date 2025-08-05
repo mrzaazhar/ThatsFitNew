@@ -47,7 +47,9 @@ class WorkoutService {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-      ).timeout(Duration(seconds: 120));
+      ).timeout(Duration(
+          seconds:
+              720)); // 12 minutes to allow for 10-minute server timeout + buffer
 
       print('Response received!');
       print('Response status code: ${response.statusCode}');

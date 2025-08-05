@@ -473,6 +473,21 @@ class _HomePageState extends State<HomePage> {
                                     height: 50,
                                     child: ElevatedButton(
                                       onPressed: () async {
+                                        // Get current user first (before showing dialog)
+                                        final user =
+                                            FirebaseAuth.instance.currentUser;
+                                        if (user == null) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'Please log in to generate workouts'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                          return;
+                                        }
+
                                         // Show a modern loading dialog
                                         showDialog(
                                           context: context,
@@ -521,24 +536,10 @@ class _HomePageState extends State<HomePage> {
                                           },
                                         );
 
-                                        try {
-                                          // Get current user
-                                          final user =
-                                              FirebaseAuth.instance.currentUser;
-                                          if (user == null) {
-                                            Navigator.pop(
-                                                context); // Close loading dialog
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                    'Please log in to generate workouts'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                            return;
-                                          }
+                                        // Store the dialog context for reliable dismissal
+                                        bool dialogDismissed = false;
 
+                                        try {
                                           // Create workout service instance
                                           final workoutService =
                                               WorkoutService();
@@ -550,35 +551,57 @@ class _HomePageState extends State<HomePage> {
                                             userId: user.uid,
                                           );
 
-                                          // Close loading dialog
-                                          Navigator.pop(context);
+                                          // Safely close loading dialog
+                                          if (context.mounted &&
+                                              !dialogDismissed) {
+                                            Navigator.pop(context);
+                                            dialogDismissed = true;
+                                          }
 
                                           // Extract the workoutPlan from the response
                                           final workoutPlan =
                                               workoutData['workoutPlan'];
 
+                                          // Validate workout data
+                                          if (workoutPlan == null) {
+                                            throw Exception(
+                                                'No workout plan received from server');
+                                          }
+
                                           // Navigate to workout page with generated data
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => WorkoutPage(
-                                                suggestedWorkout: workoutPlan,
+                                          if (context.mounted) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    WorkoutPage(
+                                                  suggestedWorkout: workoutPlan,
+                                                ),
                                               ),
-                                            ),
-                                          );
+                                            );
+                                          }
                                         } catch (e) {
-                                          // Close loading dialog
-                                          Navigator.pop(context);
+                                          print('Error generating workout: $e');
+
+                                          // Safely close loading dialog
+                                          if (context.mounted &&
+                                              !dialogDismissed) {
+                                            Navigator.pop(context);
+                                            dialogDismissed = true;
+                                          }
 
                                           // Show error message
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                  'Failed to generate workout: ${e.toString()}'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Failed to generate workout: ${e.toString()}'),
+                                                backgroundColor: Colors.red,
+                                                duration: Duration(seconds: 4),
+                                              ),
+                                            );
+                                          }
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(

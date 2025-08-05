@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'edit_profile1.dart';
-import 'delete_profile.dart';
 import 'main.dart';
 import 'setup_profile.dart';
 
@@ -539,20 +538,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) => EditProfile1(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  SizedBox(height: 16),
-                                  _buildProfileOption(
-                                    Icons.delete,
-                                    'Delete Profile',
-                                    () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              DeleteProfilePage(),
                                         ),
                                       );
                                     },

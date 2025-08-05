@@ -522,18 +522,34 @@ async function query(data) {
         console.log('\n=== Calling Flowise API ===');
         console.log('Data being sent to Flowise:', data);
         
+        // Create AbortController for 10-minute timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes = 600000ms
+        
         const response = await fetch(
-            "http://localhost:3000/api/v1/prediction/5bdfeb41-b68c-4eba-b643-52ffd8900b3a",
+            "https://app1.sigmaniac.site/api/v1/prediction/982dd61f-e56b-4e6e-9531-12ce60931c16",
             {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                signal: controller.signal
             }
         );
         
+        clearTimeout(timeoutId); // Clear timeout if request completes
+        
         console.log('Flowise API Response Status:', response.status);
+        
+        // Check if response is HTML (error page) instead of JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            const htmlText = await response.text();
+            console.error('Received HTML response instead of JSON:', htmlText.substring(0, 200));
+            throw new Error(`Flowise API returned HTML error page. Status: ${response.status}`);
+        }
+        
         const result = await response.json();
         console.log('Flowise API Response:', result);
         
@@ -543,6 +559,11 @@ async function query(data) {
         
         return result;
     } catch (error) {
+        if (error.name === 'AbortError') {
+            console.error('Flowise API call timed out after 10 minutes');
+            throw new Error('Flowise API timeout - the AI model took longer than 10 minutes to respond. Please try again.');
+        }
+        
         console.error('Error calling Flowise API:', error);
         throw error;
     }

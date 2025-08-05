@@ -89,7 +89,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         final userData = userDoc.data() ?? {};
 
         // Create a profile document in the profile subcollection
-        final profileRef = await FirebaseFirestore.instance
+        await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .collection('profile')
@@ -150,316 +150,333 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isSmallScreen = screenSize.width < 400;
-    final isMediumScreen = screenSize.width >= 400 && screenSize.width < 600;
     return Scaffold(
-      backgroundColor: Color(0xFF121212), // Dark background
+      backgroundColor: Colors.black,
       body: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF1A1A1A), // Dark gradient start
-              Color(0xFF0D0D0D), // Dark gradient end
+              Color(0xFF1A1A1A),
+              Color(0xFF000000),
             ],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Back Button
-              Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: IconButton(
-                    icon: Icon(Icons.arrow_back,
-                        color: Colors.white, size: isSmallScreen ? 20 : 24),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+              // Header Section with Back Button
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Setup Profile',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              // Flexible content area
+              // Main Content
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isSmallScreen ? 16.0 : 20.0,
-                    vertical: isSmallScreen ? 10.0 : 20.0,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      // Title
-                      Container(
-                        margin: EdgeInsets.only(
-                          top: isSmallScreen ? 20.0 : 30.0,
-                          bottom: isSmallScreen ? 30.0 : 40.0,
-                        ),
-                        child: Text(
-                          'Setup Profile',
-                          style: TextStyle(
-                            fontSize:
-                                isSmallScreen ? 24 : (isMediumScreen ? 28 : 30),
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'aileron',
-                            color: Colors.white,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                      SizedBox(height: 20),
 
-                      // Profile Form Card
+                      // Profile Setup Card
                       Container(
                         width: double.infinity,
-                        constraints: BoxConstraints(
-                          maxWidth: 500,
-                          minHeight: screenSize.height * 0.6,
+                        padding: EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(24),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.1)),
                         ),
-                        child: Card(
-                          color: Color(0xFF1E1E1E),
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(isSmallScreen ? 20 : 30),
-                          ),
-                          elevation: 10,
-                          shadowColor: Colors.black54,
-                          child: Padding(
-                            padding:
-                                EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Card Title
+                            Row(
                               children: [
-                                SizedBox(height: isSmallScreen ? 10 : 20),
-
-                                // Age Field
-                                TextField(
-                                  controller: _ageController,
-                                  keyboardType: TextInputType.number,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: isSmallScreen ? 14 : 16,
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'Age',
-                                    labelStyle: TextStyle(
-                                      fontFamily: 'DM Sans',
-                                      color: Colors.grey[400],
-                                      fontSize: isSmallScreen ? 14 : 16,
-                                    ),
-                                    filled: true,
-                                    fillColor: Color(0xFF2A2A2A),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide(
-                                          color: Color(0xFF6e9277), width: 2),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: isSmallScreen ? 16 : 20,
-                                      vertical: isSmallScreen ? 12 : 16,
-                                    ),
-                                  ),
-                                ),
-
-                                SizedBox(height: isSmallScreen ? 15 : 20),
-
-                                // Weight Field
-                                TextField(
-                                  controller: _weightController,
-                                  keyboardType: TextInputType.number,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: isSmallScreen ? 14 : 16,
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'Weight (kg)',
-                                    labelStyle: TextStyle(
-                                      fontFamily: 'DM Sans',
-                                      color: Colors.grey[400],
-                                      fontSize: isSmallScreen ? 14 : 16,
-                                    ),
-                                    filled: true,
-                                    fillColor: Color(0xFF2A2A2A),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide(
-                                          color: Color(0xFF6e9277), width: 2),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                          isSmallScreen ? 15 : 20),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: isSmallScreen ? 16 : 20,
-                                      vertical: isSmallScreen ? 12 : 16,
-                                    ),
-                                  ),
-                                ),
-
-                                SizedBox(height: isSmallScreen ? 15 : 20),
-
-                                // Gender Dropdown
                                 Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isSmallScreen ? 16 : 20,
-                                    vertical: isSmallScreen ? 4 : 8,
-                                  ),
+                                  padding: EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Color(0xFF2A2A2A),
-                                    borderRadius: BorderRadius.circular(
-                                        isSmallScreen ? 15 : 20),
-                                    border:
-                                        Border.all(color: Colors.transparent),
+                                    color: Color(0xFF6e9277).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedGender,
-                                      isExpanded: true,
-                                      dropdownColor: Color(0xFF2A2A2A),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'DM Sans',
-                                        fontSize: isSmallScreen ? 14 : 16,
-                                      ),
-                                      items: _genders.map((String gender) {
-                                        return DropdownMenuItem<String>(
-                                          value: gender,
-                                          child: Text(
-                                            gender,
-                                            style: TextStyle(
-                                              fontFamily: 'DM Sans',
-                                              color: Colors.white,
-                                              fontSize: isSmallScreen ? 14 : 16,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        if (newValue != null) {
-                                          setState(() {
-                                            _selectedGender = newValue;
-                                          });
-                                        }
-                                      },
-                                    ),
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    color: Color(0xFF6e9277),
+                                    size: 24,
                                   ),
                                 ),
-
-                                SizedBox(height: isSmallScreen ? 15 : 20),
-
-                                // Experience Level Dropdown
-                                Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: isSmallScreen ? 16 : 20,
-                                    vertical: isSmallScreen ? 4 : 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFF2A2A2A),
-                                    borderRadius: BorderRadius.circular(
-                                        isSmallScreen ? 15 : 20),
-                                    border:
-                                        Border.all(color: Colors.transparent),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: _selectedExperience,
-                                      isExpanded: true,
-                                      dropdownColor: Color(0xFF2A2A2A),
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'DM Sans',
-                                        fontSize: isSmallScreen ? 14 : 16,
-                                      ),
-                                      items:
-                                          _experienceLevels.map((String level) {
-                                        return DropdownMenuItem<String>(
-                                          value: level,
-                                          child: Text(
-                                            level,
-                                            style: TextStyle(
-                                              fontFamily: 'DM Sans',
-                                              color: Colors.white,
-                                              fontSize: isSmallScreen ? 14 : 16,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (String? newValue) {
-                                        if (newValue != null) {
-                                          setState(() {
-                                            _selectedExperience = newValue;
-                                          });
-                                        }
-                                      },
-                                    ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Personal Information',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'Poppins',
+                                    color: Colors.white,
                                   ),
                                 ),
-
-                                SizedBox(height: isSmallScreen ? 25 : 30),
-
-                                // Save Button
-                                Container(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () => _saveProfile(context),
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: isSmallScreen ? 12 : 15,
-                                      ),
-                                      child: Text(
-                                        'Save Profile',
-                                        style: TextStyle(
-                                          fontSize: isSmallScreen ? 14 : 16,
-                                          fontFamily: 'DM Sans',
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Color(0xFF6e9277),
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: isSmallScreen ? 30 : 40,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                            isSmallScreen ? 15 : 20),
-                                      ),
-                                      elevation: 5,
-                                      shadowColor:
-                                          Color(0xFF6e9277).withOpacity(0.3),
-                                    ),
-                                  ),
-                                ),
-
-                                SizedBox(height: isSmallScreen ? 20 : 30),
                               ],
                             ),
-                          ),
+                            SizedBox(height: 24),
+
+                            // Age Field
+                            Text(
+                              'Age',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.9),
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: TextField(
+                                controller: _ageController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'Poppins',
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter your age',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+
+                            // Weight Field
+                            Text(
+                              'Weight (kg)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.9),
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: TextField(
+                                controller: _weightController,
+                                keyboardType: TextInputType.numberWithOptions(
+                                    decimal: true),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'Poppins',
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter your weight',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+
+                            // Gender Field
+                            Text(
+                              'Gender',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.9),
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedGender,
+                                  isExpanded: true,
+                                  dropdownColor: Color(0xFF2A2A2A),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                  ),
+                                  items: _genders.map((String gender) {
+                                    return DropdownMenuItem<String>(
+                                      value: gender,
+                                      child: Text(
+                                        gender,
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    if (newValue != null) {
+                                      setState(() {
+                                        _selectedGender = newValue;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 20),
+
+                            // Experience Level Field
+                            Text(
+                              'Experience Level',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withOpacity(0.9),
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.1)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedExperience,
+                                  isExpanded: true,
+                                  dropdownColor: Color(0xFF2A2A2A),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                  ),
+                                  items: _experienceLevels.map((String level) {
+                                    return DropdownMenuItem<String>(
+                                      value: level,
+                                      child: Text(
+                                        level,
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (String? newValue) {
+                                    if (newValue != null) {
+                                      setState(() {
+                                        _selectedExperience = newValue;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 32),
+
+                            // Save Button
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () => _saveProfile(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF6e9277),
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.save_outlined, size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Save Profile',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      SizedBox(height: 40),
                     ],
                   ),
                 ),
